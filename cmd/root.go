@@ -12,8 +12,7 @@ import (
 func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "binstall [OPTIONS] [COMMANDS]",
-		Short: "Tool to delete 'node_modules'",
-		Long:  `binstall can be used to delete 'node_modules' recursively from sub-folders`,
+		Short: "binstall is a tool to download and install binaries",
 	}
 
 	rootCmd.AddCommand(download.NewDownloadCmd())
