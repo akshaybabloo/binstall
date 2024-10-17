@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
@@ -66,7 +67,7 @@ func CalculateSHA256(filePath string) (string, error) {
 	defer file.Close()
 
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
+	if _, err := io.Copy(hash, bufio.NewReader(file)); err != nil {
 		return "", err
 	}
 
