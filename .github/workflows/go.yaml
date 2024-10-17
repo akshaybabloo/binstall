@@ -1,7 +1,7 @@
 name: "Go Test and Release"
 
 on:
-  #  TODO: Change this to release
+  workflow_dispatch:
   push:
     branches: [ main ]
   release:
@@ -9,8 +9,10 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:
+permissions:
+  contents: write
 
+jobs:
   build:
     runs-on: ubuntu-latest
     steps:
@@ -37,4 +39,4 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
