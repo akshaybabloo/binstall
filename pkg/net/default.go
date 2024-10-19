@@ -228,10 +228,14 @@ func moveFiles(b *models.Binaries) error {
 		dstPath := filepath.Join(b.InstallLocation, file.FileName)
 
 		// Check version before move
-		cmd := exec.Command(srcPath, file.VersionCommand.Args)
-		stdout, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to execute %s before move: %w\nOutput: %s", file.FileName, err, stdout)
+		var cmd *exec.Cmd
+		var stdout []byte
+		if file.Execute {
+			cmd = exec.Command(srcPath, file.VersionCommand.Args)
+			stdout, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to execute %s before move: %w\nOutput: %s", file.FileName, err, stdout)
+			}
 		}
 
 		// Check if source file exists
@@ -245,36 +249,38 @@ func moveFiles(b *models.Binaries) error {
 			return fmt.Errorf("failed to remove existing file %s: %w", dstPath, err)
 		}
 
-		// Move the file
-		err = os.Rename(srcPath, dstPath)
-		if err != nil {
-			return fmt.Errorf("failed to move file from %s to %s: %w", srcPath, dstPath, err)
-		}
-
-		// Verify the file was moved
-		if _, err := os.Stat(dstPath); os.IsNotExist(err) {
-			return fmt.Errorf("file was not successfully moved to %s", dstPath)
-		}
-
-		// Set execute permissions if needed
-		if file.Execute {
-			err = os.Chmod(dstPath, 0755)
+		if file.CopyIt {
+			// Move the file
+			err = os.Rename(srcPath, dstPath)
 			if err != nil {
-				return fmt.Errorf("failed to set execute permissions on %s: %w", dstPath, err)
+				return fmt.Errorf("failed to move file from %s to %s: %w", srcPath, dstPath, err)
 			}
-		}
 
-		// Verify permissions
-		_, err = os.Stat(dstPath)
-		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", dstPath, err)
-		}
+			// Verify the file was moved
+			if _, err := os.Stat(dstPath); os.IsNotExist(err) {
+				return fmt.Errorf("file was not successfully moved to %s", dstPath)
+			}
 
-		// Check version after move
-		cmd = exec.Command(dstPath, file.VersionCommand.Args)
-		stdout, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to execute %s after move: %w\nOutput: %s", file.FileName, err, stdout)
+			// Set execute permissions if needed
+			if file.Execute {
+				err = os.Chmod(dstPath, 0755)
+				if err != nil {
+					return fmt.Errorf("failed to set execute permissions on %s: %w", dstPath, err)
+				}
+			}
+
+			// Verify permissions
+			_, err = os.Stat(dstPath)
+			if err != nil {
+				return fmt.Errorf("failed to get file info for %s: %w", dstPath, err)
+			}
+
+			// Check version after move
+			cmd = exec.Command(dstPath, file.VersionCommand.Args)
+			stdout, err = cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to execute %s after move: %w\nOutput: %s", file.FileName, err, stdout)
+			}
 		}
 	}
 
