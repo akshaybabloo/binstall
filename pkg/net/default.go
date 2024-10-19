@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/akshaybabloo/binstall/pkg"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -102,6 +103,7 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 			checkV, err := checkForNewVersion(pr)
 			if err != nil {
 				if errors.Is(err, pkg.NetBinaryNotFound) {
+					log.Println("No binary found for the current OS and Arch" + b.Name)
 					return models.Binaries{}, nil
 				}
 				return models.Binaries{}, err
@@ -119,6 +121,10 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 	pr := findProvider(_version)
 	checkV, err := checkForNewVersion(pr)
 	if err != nil {
+		if errors.Is(err, pkg.NetBinaryNotFound) {
+			log.Println("No binary found for the current OS and Arch" + b.Name)
+			return models.Binaries{}, nil
+		}
 		return models.Binaries{}, err
 	}
 
