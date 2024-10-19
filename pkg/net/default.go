@@ -232,6 +232,9 @@ func moveFiles(b *models.Binaries) error {
 	for _, file := range b.Files {
 		srcPath := filepath.Join(b.DownloadFolder, file.FileName)
 		dstPath := filepath.Join(b.InstallLocation, file.FileName)
+		if file.RenameTo != "" {
+			dstPath = filepath.Join(b.InstallLocation, file.RenameTo)
+		}
 
 		// Check version before move
 		var cmd *exec.Cmd
@@ -268,11 +271,9 @@ func moveFiles(b *models.Binaries) error {
 			}
 
 			// Set execute permissions if needed
-			if file.Execute {
-				err = os.Chmod(dstPath, 0755)
-				if err != nil {
-					return fmt.Errorf("failed to set execute permissions on %s: %w", dstPath, err)
-				}
+			err = os.Chmod(dstPath, 0755)
+			if err != nil {
+				return fmt.Errorf("failed to set execute permissions on %s: %w", dstPath, err)
 			}
 
 			// Verify permissions
@@ -281,11 +282,13 @@ func moveFiles(b *models.Binaries) error {
 				return fmt.Errorf("failed to get file info for %s: %w", dstPath, err)
 			}
 
-			// Check version after move
-			cmd = exec.Command(dstPath, file.VersionCommand.Args)
-			stdout, err = cmd.CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("failed to execute %s after move: %w\nOutput: %s", file.FileName, err, stdout)
+			if file.Execute {
+				// Check version after move
+				cmd = exec.Command(dstPath, file.VersionCommand.Args)
+				stdout, err = cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("failed to execute %s after move: %w\nOutput: %s", file.FileName, err, stdout)
+				}
 			}
 		}
 	}

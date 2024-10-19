@@ -11,7 +11,8 @@ type File struct {
 	Execute        bool           `yaml:"execute,omitempty" json:"execute"`
 	FileName       string         `yaml:"fileName,omitempty" json:"fileName"`
 	Exists         bool           `yaml:"exists,omitempty" json:"exists,omitempty"`
-	CopyIt         bool           `yaml:"copyIt" json:"copyIt"` // Copy the binary to the install location
+	CopyIt         bool           `yaml:"copyIt" json:"copyIt"`                         // Copy the binary to the install location
+	RenameTo       string         `yaml:"renameTo,omitempty" json:"renameTo,omitempty"` // Rename the binary to this name
 	VersionCommand VersionCommand `yaml:"versionCommand,omitempty" json:"versionCommand,omitempty"`
 }
 

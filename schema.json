@@ -80,6 +80,9 @@
         "copyIt": {
           "type": "boolean"
         },
+        "renameTo": {
+          "type": "string"
+        },
         "versionCommand": {
           "$ref": "#/$defs/VersionCommand"
         }
