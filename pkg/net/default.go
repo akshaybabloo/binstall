@@ -37,11 +37,14 @@ func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 			cmd := exec.Command(file.FileName, file.VersionCommand.Args)
 			stdout, err := cmd.Output()
 			if err != nil {
-				return models.Binaries{}, err
+				if errors.Is(err, exec.ErrNotFound) {
+					return models.Binaries{}, exec.ErrNotFound
+				}
+				return models.Binaries{}, errors.New("failed to get the current version: " + err.Error())
 			}
 			r, err := regexp.Compile(file.VersionCommand.RegexVersion)
 			if err != nil {
-				return models.Binaries{}, err
+				return models.Binaries{}, errors.New("failed to compile the regex: " + err.Error())
 			}
 			if r.MatchString(string(stdout)) {
 				matched := r.FindString(string(stdout))
@@ -122,20 +125,23 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 	checkV, err := checkForNewVersion(pr)
 	if err != nil {
 		if errors.Is(err, pkg.NetBinaryNotFound) {
-			log.Println("No binary found for the current OS and Arch" + b.Name)
+			log.Println("No binary found for the current OS and Arch " + b.Name)
 			return models.Binaries{}, nil
 		}
-		return models.Binaries{}, err
+		return models.Binaries{}, errors.New("error checking for new version: " + err.Error())
+	}
+	if checkV.CurrentVersion == "" {
+		checkV.CurrentVersion = "0.0.0"
 	}
 
 	currentVersion, err := version.NewVersion(checkV.CurrentVersion)
 	if err != nil {
-		return models.Binaries{}, errors.New("error parsing the current version " + err.Error())
+		return models.Binaries{}, errors.New("error parsing the current version: " + err.Error())
 	}
 
 	newVersion, err := version.NewVersion(checkV.NewVersion)
 	if err != nil {
-		return models.Binaries{}, errors.New("error parsing the new version " + err.Error())
+		return models.Binaries{}, errors.New("error parsing the new version: " + err.Error())
 	}
 
 	if currentVersion.LessThan(newVersion) {
@@ -159,7 +165,7 @@ func downloadFile(b models.Binaries) (models.Binaries, error) {
 	client := resty.New()
 	_, err := client.R().SetOutput(filepath.Join(b.DownloadFilePath)).Get(b.DownloadURL)
 	if err != nil {
-		return models.Binaries{}, err
+		return models.Binaries{}, errors.New("failed to download the file: " + err.Error())
 	}
 	return b, nil
 }
@@ -170,7 +176,7 @@ func verifyFile(b models.Binaries) (bool, error) {
 		client := resty.New()
 		r, err := client.R().Get(b.Sha.URL)
 		if err != nil {
-			return false, err
+			return false, errors.New("failed to get the checksum file: " + err.Error())
 		}
 
 		shaStr := string(r.Body())
@@ -180,7 +186,7 @@ func verifyFile(b models.Binaries) (bool, error) {
 		} else if b.Sha.ShaType == "sha256" {
 			sha256, err := utils.CalculateSHA256(b.DownloadFilePath)
 			if err != nil {
-				return false, err
+				return false, errors.New("failed to calculate the sha256: " + err.Error())
 			}
 			if sha256 != shaStr {
 				return false, errors.New("checksums do not match")
@@ -202,7 +208,7 @@ func uncompressFile(b models.Binaries) error {
 	}
 	_, _, _, err := xtractr.ExtractFile(x)
 	if err != nil {
-		return err
+		return errors.New("failed to uncompress the file: " + err.Error())
 	}
 	return nil
 }
