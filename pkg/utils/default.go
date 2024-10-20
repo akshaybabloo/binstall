@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/akshaybabloo/binstall/models"
@@ -72,4 +73,24 @@ func CalculateSHA256(filePath string) (string, error) {
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// Contains checks if a string is in a slice
+func Contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+// FileNameWithoutExtension returns the file name without the extension
+func FileNameWithoutExtension(fileName string) string {
+	baseName := filepath.Base(fileName)
+	name := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+	for filepath.Ext(name) != "" {
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+	return name
 }

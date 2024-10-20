@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/akshaybabloo/binstall/pkg"
-	"log"
+	"mime"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/akshaybabloo/binstall/pkg"
+	"github.com/sirupsen/logrus"
 
 	"github.com/akshaybabloo/binstall/models"
 	"github.com/akshaybabloo/binstall/pkg/utils"
@@ -29,6 +31,9 @@ const (
 	GitHub = iota + 1
 	Others
 )
+
+var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
+var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw"}
 
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
@@ -76,17 +81,19 @@ func checkForNewVersion(b models.Binaries) (models.Binaries, error) {
 
 		for _, asset := range releases.Assets {
 			osArch := utils.FigureOutOSAndArch(asset.GetName())
-			if runtime.GOOS == osArch.OS && runtime.GOARCH == osArch.Arch {
+			ext := filepath.Ext(asset.GetName())
+			if runtime.GOOS == osArch.OS && runtime.GOARCH == osArch.Arch && !utils.Contains(ignoreFileExt, ext) {
 				b.DownloadURL = asset.GetBrowserDownloadURL()
 				b.NewVersion = releases.GetTagName()
 				b.DownloadFileName = asset.GetName()
+				b.ContentType = asset.GetContentType()
 				b.OsInfo = osArch
 				break
 			}
 		}
 	}
 	if b.DownloadURL == "" {
-		return models.Binaries{}, pkg.NetBinaryNotFound
+		return models.Binaries{}, pkg.ErrNetBinaryNotFound
 	}
 	return b, nil
 }
@@ -105,8 +112,8 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 			pr := findProvider(b)
 			checkV, err := checkForNewVersion(pr)
 			if err != nil {
-				if errors.Is(err, pkg.NetBinaryNotFound) {
-					log.Println("No binary found for the current OS and Arch" + b.Name)
+				if errors.Is(err, pkg.ErrNetBinaryNotFound) {
+					logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)
 					return models.Binaries{}, nil
 				}
 				return models.Binaries{}, err
@@ -124,8 +131,8 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 	pr := findProvider(_version)
 	checkV, err := checkForNewVersion(pr)
 	if err != nil {
-		if errors.Is(err, pkg.NetBinaryNotFound) {
-			log.Println("No binary found for the current OS and Arch " + b.Name)
+		if errors.Is(err, pkg.ErrNetBinaryNotFound) {
+			logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)
 			return models.Binaries{}, nil
 		}
 		return models.Binaries{}, errors.New("error checking for new version: " + err.Error())
@@ -202,18 +209,28 @@ func uncompressFile(b models.Binaries) error {
 		return errors.New("no file to uncompress")
 	}
 
+	mediaType, _, err := mime.ParseMediaType(b.ContentType)
+	if err != nil {
+		return err
+	}
+	// Check if the file is a gzip or zip file, if not return nil
+	if !utils.Contains(allowedMediaTypes, mediaType) {
+		return nil
+	}
+
 	x := &xtractr.XFile{
 		FilePath:  b.DownloadFilePath,
 		OutputDir: b.DownloadFolder,
 	}
-	_, _, _, err := xtractr.ExtractFile(x)
+	o1, o2, o3, err := xtractr.ExtractFile(x)
 	if err != nil {
 		return errors.New("failed to uncompress the file: " + err.Error())
 	}
+	logrus.Debugf("Size %d, %v files, %v files\n", o1, o2, o3)
 	return nil
 }
 
-func moveFiles(b *models.Binaries) error {
+func moveFiles(b *models.Binaries, path ...string) error {
 	// Expand the ~ to the home directory
 	if strings.HasPrefix(b.InstallLocation, "~/") {
 		homeDir, err := os.UserHomeDir()
@@ -239,30 +256,44 @@ func moveFiles(b *models.Binaries) error {
 		// Check version before move
 		var cmd *exec.Cmd
 		var stdout []byte
-		if file.Execute {
-			cmd = exec.Command(srcPath, file.VersionCommand.Args)
-			stdout, err := cmd.CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("failed to execute %s before move: %w\nOutput: %s", file.FileName, err, stdout)
+		if file.ExecuteWhenCopying {
+
+			if file.Execute || !file.CopyIt {
+				cmd = exec.Command(srcPath, file.VersionCommand.Args)
+				stdout, err := cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("failed to execute %s before move: %w\nOutput: %s", file.FileName, err, stdout)
+				}
 			}
-		}
 
-		// Check if source file exists
-		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-			return fmt.Errorf("source file does not exist: %s", srcPath)
-		}
+			// Check if source file exists
+			if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+				return fmt.Errorf("source file does not exist: %s", srcPath)
+			}
 
-		// Remove the destination file if it exists
-		err = os.Remove(dstPath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove existing file %s: %w", dstPath, err)
+			// Remove the destination file if it exists
+			err = os.Remove(dstPath)
+			if err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove existing file %s: %w", dstPath, err)
+			}
 		}
 
 		if file.CopyIt {
 			// Move the file
 			err = os.Rename(srcPath, dstPath)
 			if err != nil {
-				return fmt.Errorf("failed to move file from %s to %s: %w", srcPath, dstPath, err)
+				if errors.Is(err, os.ErrNotExist) {
+					// Try to adjust the path, this seems to happen with xz files
+					p := strings.Split(srcPath, "/")
+					f := utils.FileNameWithoutExtension(b.DownloadFileName)
+					srcPath = filepath.Join(b.DownloadFolder, f, p[len(p)-1])
+					err = os.Rename(srcPath, dstPath)
+					if err != nil {
+						return fmt.Errorf("file not found even after path adjustment: %w", err)
+					}
+				} else {
+					return fmt.Errorf("failed to move file from %s to %s: %w", srcPath, dstPath, err)
+				}
 			}
 
 			// Verify the file was moved
@@ -317,7 +348,7 @@ func verifyNewBin(b models.Binaries) error {
 
 		// Check if the actual path matches the expected path
 		if actualPath != fullPath {
-
+			logrus.Debugf("Actual path: %s, Expected path: %s", actualPath, fullPath)
 		}
 
 		// Execute the binary using the full path
@@ -351,9 +382,7 @@ func verifyNewBin(b models.Binaries) error {
 			return fmt.Errorf("version mismatch for %s. Installed: %s, Expected: %s",
 				file.FileName, installedVersion.String(), newVersion.String())
 		}
-
 	}
-
 	return nil
 }
 

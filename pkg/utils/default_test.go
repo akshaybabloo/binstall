@@ -3,12 +3,13 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/akshaybabloo/binstall/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/akshaybabloo/binstall/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExpandGitHubURL(t *testing.T) {
@@ -120,6 +121,26 @@ func TestParseYaml(t *testing.T) {
 			}
 			assert.NoError(t, err, "ParseYaml() should not return an error")
 			assert.Equalf(t, tt.want, got, "ParseYaml(%v)", tt.args.s)
+		})
+	}
+}
+
+func TestFileNameWithoutExtension(t *testing.T) {
+	type args struct {
+		fileName string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{name: "no extension", args: args{fileName: "test"}, want: "test"},
+		{name: "with extension", args: args{fileName: "test.txt"}, want: "test"},
+		{name: "with multiple extensions", args: args{fileName: "test.txt.gz"}, want: "test"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, FileNameWithoutExtension(tt.args.fileName), "FileNameWithoutExtension(%v)", tt.args.fileName)
 		})
 	}
 }

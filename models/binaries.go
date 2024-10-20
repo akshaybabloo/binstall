@@ -8,12 +8,13 @@ type VersionCommand struct {
 
 // File holds the information about the binary files
 type File struct {
-	Execute        bool           `yaml:"execute,omitempty" json:"execute"`
-	FileName       string         `yaml:"fileName,omitempty" json:"fileName"`
-	Exists         bool           `yaml:"exists,omitempty" json:"exists,omitempty"`
-	CopyIt         bool           `yaml:"copyIt" json:"copyIt"`                         // Copy the binary to the install location
-	RenameTo       string         `yaml:"renameTo,omitempty" json:"renameTo,omitempty"` // Rename the binary to this name
-	VersionCommand VersionCommand `yaml:"versionCommand,omitempty" json:"versionCommand,omitempty"`
+	Execute            bool           `yaml:"execute,omitempty" json:"execute"`
+	FileName           string         `yaml:"fileName,omitempty" json:"fileName"`
+	Exists             bool           `yaml:"exists,omitempty" json:"exists,omitempty"`
+	CopyIt             bool           `yaml:"copyIt" json:"copyIt"`                         // Copy the binary to the install location
+	RenameTo           string         `yaml:"renameTo,omitempty" json:"renameTo,omitempty"` // Rename the binary to this name
+	ExecuteWhenCopying bool           `yaml:"executeWhenCopying,omitempty" json:"executeWhenCopying,omitempty"`
+	VersionCommand     VersionCommand `yaml:"versionCommand,omitempty" json:"versionCommand,omitempty"`
 }
 
 // ShaInfo holds the information about the SHA checksum
@@ -51,6 +52,7 @@ type Binaries struct {
 	OsInfo           OSArch  `yaml:"osInfo,omitempty" json:"osInfo,omitempty"`
 	DownloadURL      string  `yaml:"downloadURL,omitempty" json:"downloadURL,omitempty"`
 	DownloadFileName string  `yaml:"downloadFileName,omitempty" json:"downloadFileName,omitempty"`
+	ContentType      string  `yaml:"contentType,omitempty" json:"contentType,omitempty"`
 	DownloadFolder   string  `yaml:"downloadFolder,omitempty" json:"downloadFolder,omitempty"`
 	DownloadFilePath string  `yaml:"downloadPath,omitempty" json:"downloadPath,omitempty"`
 	InstallLocation  string  `yaml:"installLocation" json:"installLocation"`
