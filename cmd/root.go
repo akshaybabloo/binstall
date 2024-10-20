@@ -3,10 +3,14 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/akshaybabloo/binstall/cmd/download"
 	"github.com/akshaybabloo/binstall/cmd/schema"
 	"github.com/spf13/cobra"
 )
+
+var verbose bool
 
 // NewRootCmd root command
 func NewRootCmd(appVersion, buildDate string) *cobra.Command {
@@ -23,6 +27,16 @@ func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	rootCmd.Version = formattedVersion
 
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "verbose output")
+
+	if verbose {
+		level, err := logrus.ParseLevel("debug")
+		if err != nil {
+			return nil
+		}
+		logrus.SetLevel(level)
+	}
 
 	return rootCmd
 }
