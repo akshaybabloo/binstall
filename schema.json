@@ -38,6 +38,9 @@
         "downloadFileName": {
           "type": "string"
         },
+        "contentType": {
+          "type": "string"
+        },
         "downloadFolder": {
           "type": "string"
         },
@@ -82,6 +85,9 @@
         },
         "renameTo": {
           "type": "string"
+        },
+        "executeWhenCopying": {
+          "type": "boolean"
         },
         "versionCommand": {
           "$ref": "#/$defs/VersionCommand"
