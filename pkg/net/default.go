@@ -33,7 +33,7 @@ const (
 )
 
 var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
-var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw"}
+var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw", "application/x-gtar"}
 
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
@@ -143,12 +143,12 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 
 	currentVersion, err := version.NewVersion(checkV.CurrentVersion)
 	if err != nil {
-		return models.Binaries{}, errors.New("error parsing the current version: " + err.Error())
+		return models.Binaries{}, fmt.Errorf("error parsing the current version for %s: %w ", b.Name, err)
 	}
 
 	newVersion, err := version.NewVersion(checkV.NewVersion)
 	if err != nil {
-		return models.Binaries{}, errors.New("error parsing the new version: " + err.Error())
+		return models.Binaries{}, fmt.Errorf("error parsing the new version for %s: %w ", b.Name, err)
 	}
 
 	if currentVersion.LessThan(newVersion) {
@@ -375,7 +375,7 @@ func verifyNewBin(b models.Binaries) error {
 
 		newVersion, err := version.NewVersion(strings.TrimSpace(b.NewVersion))
 		if err != nil {
-			return fmt.Errorf("failed to parse new version: %w", err)
+			return fmt.Errorf("failed to parse new version for %s: %w", file.FileName, err)
 		}
 
 		if !installedVersion.Equal(newVersion) {
