@@ -8,12 +8,12 @@ import (
 )
 
 var (
-	version   = "dev"
-	buildDate = ""
+	version = "dev"
+	date    = ""
 )
 
 func main() {
-	rootCmd := cmd.NewRootCmd(version, buildDate)
+	rootCmd := cmd.NewRootCmd(version, date)
 	err := rootCmd.Execute()
 	if err != nil {
 		fmt.Println(err)
