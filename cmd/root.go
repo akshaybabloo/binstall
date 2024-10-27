@@ -17,6 +17,16 @@ func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "binstall [OPTIONS] [COMMANDS]",
 		Short: "binstall is a tool to download and install binaries",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if verbose {
+				level, err := logrus.ParseLevel("debug")
+				if err != nil {
+					return err
+				}
+				logrus.SetLevel(level)
+			}
+			return nil
+		},
 	}
 
 	rootCmd.AddCommand(download.NewDownloadCmd())
@@ -29,14 +39,6 @@ func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "verbose output")
-
-	if verbose {
-		level, err := logrus.ParseLevel("debug")
-		if err != nil {
-			return nil
-		}
-		logrus.SetLevel(level)
-	}
 
 	return rootCmd
 }
