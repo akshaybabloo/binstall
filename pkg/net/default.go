@@ -33,7 +33,7 @@ const (
 )
 
 var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
-var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw", "application/x-gtar"}
+var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw", "application/x-gtar", "application/octet-stream"}
 
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
@@ -215,7 +215,7 @@ func uncompressFile(b models.Binaries) error {
 	}
 	// Check if the file is a gzip or zip file, if not return nil
 	if !utils.Contains(allowedMediaTypes, mediaType) {
-		return nil
+		return fmt.Errorf("file type not supported: %s. Allowed types: %v", mediaType, allowedMediaTypes)
 	}
 
 	x := &xtractr.XFile{
