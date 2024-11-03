@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/akshaybabloo/binstall/cmd/upgrade"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +35,7 @@ func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 
 	rootCmd.AddCommand(download.NewDownloadCmd())
 	rootCmd.AddCommand(schema.NewSchemaCmd())
+	rootCmd.AddCommand(upgrade.NewUpgradeCmd())
 
 	formattedVersion := format(appVersion, buildDate)
 	rootCmd.SetVersionTemplate(formattedVersion)
