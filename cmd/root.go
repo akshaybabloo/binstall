@@ -1,3 +1,4 @@
+// Package cmd provides the command line interface for binstall.
 package cmd
 
 import (
@@ -12,7 +13,9 @@ import (
 
 var verbose bool
 
-// NewRootCmd root command
+// NewRootCmd creates the root command for the binstall application,
+// sets up the version template, adds subcommands, and configures
+// persistent flags such as the verbose flag.
 func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "binstall [OPTIONS] [COMMANDS]",

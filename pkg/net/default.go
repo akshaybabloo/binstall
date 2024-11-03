@@ -170,7 +170,7 @@ func downloadFile(b models.Binaries) (models.Binaries, error) {
 	b.DownloadFilePath = filepath.Join(b.DownloadFolder, b.DownloadFileName)
 
 	client := resty.New()
-	_, err := client.R().SetOutput(filepath.Join(b.DownloadFilePath)).Get(b.DownloadURL)
+	_, err := client.R().SetOutput(b.DownloadFilePath).Get(b.DownloadURL)
 	if err != nil {
 		return models.Binaries{}, errors.New("failed to download the file: " + err.Error())
 	}
@@ -284,9 +284,9 @@ func moveFiles(b *models.Binaries, path ...string) error {
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					// Try to adjust the path, this seems to happen with xz files
-					p := strings.Split(srcPath, "/")
+					pathParts := strings.Split(srcPath, "/")
 					f := utils.FileNameWithoutExtension(b.DownloadFileName)
-					srcPath = filepath.Join(b.DownloadFolder, f, p[len(p)-1])
+					srcPath = filepath.Join(b.DownloadFolder, f, pathParts[len(pathParts)-1])
 					err = os.Rename(srcPath, dstPath)
 					if err != nil {
 						return fmt.Errorf("file not found even after path adjustment: %w", err)
@@ -348,7 +348,7 @@ func verifyNewBin(b models.Binaries) error {
 
 		// Check if the actual path matches the expected path
 		if actualPath != fullPath {
-			logrus.Debugf("Actual path: %s, Expected path: %s", actualPath, fullPath)
+			logrus.Debugf("Binary path mismatch: Actual path: %s, Expected path: %s", actualPath, fullPath)
 		}
 
 		// Execute the binary using the full path

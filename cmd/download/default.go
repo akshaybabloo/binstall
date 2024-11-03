@@ -3,13 +3,13 @@ package download
 import (
 	"errors"
 	"fmt"
+	"github.com/akshaybabloo/binstall/pkg/fileio"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/akshaybabloo/binstall/models"
-	"github.com/akshaybabloo/binstall/pkg/io"
 	"github.com/akshaybabloo/binstall/pkg/net"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
@@ -52,7 +52,7 @@ func NewDownloadCmd() *cobra.Command {
 				return errors.New("provided path is not a directory")
 			}
 
-			data, err := io.ReadYamlFiles(filepath.FromSlash(args[0]))
+			data, err := fileio.ReadYamlFiles(filepath.FromSlash(args[0]))
 			if err != nil {
 				return err
 			}
