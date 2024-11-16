@@ -7,7 +7,7 @@ require (
 	github.com/briandowns/spinner v1.23.1
 	github.com/fatih/color v1.18.0
 	github.com/go-resty/resty/v2 v2.16.0
-	github.com/goccy/go-yaml v1.12.0
+	github.com/goccy/go-yaml v1.13.7
 	github.com/google/go-github/v66 v66.0.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/invopop/jsonschema v0.12.0
@@ -27,7 +27,6 @@ require (
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-playground/validator/v10 v10.18.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -54,7 +53,6 @@ require (
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
