@@ -7,7 +7,7 @@ require (
 	github.com/briandowns/spinner v1.23.1
 	github.com/fatih/color v1.18.0
 	github.com/go-resty/resty/v2 v2.16.0
-	github.com/goccy/go-yaml v1.13.7
+	github.com/goccy/go-yaml v1.15.7
 	github.com/google/go-github/v66 v66.0.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/invopop/jsonschema v0.12.0
