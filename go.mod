@@ -10,7 +10,7 @@ require (
 	github.com/goccy/go-yaml v1.15.13
 	github.com/google/go-github/v66 v66.0.0
 	github.com/hashicorp/go-version v1.7.0
-	github.com/invopop/jsonschema v0.12.0
+	github.com/invopop/jsonschema v0.13.0
 	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
