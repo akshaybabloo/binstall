@@ -77,7 +77,7 @@ func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error)
 		info := utils.ExpandGitHubURL(b.URL)
 		var c *github.Client
 
-		if len(a) > 0 {
+		if len(a) > 0 && a[0] != "" {
 			b.Token = a[0]
 			c = github.NewClient(nil).WithAuthToken(b.Token)
 		} else {
