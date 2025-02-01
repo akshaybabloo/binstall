@@ -136,8 +136,8 @@ func TestFileNameWithoutExtension(t *testing.T) {
 		want string
 	}{
 		{name: "no extension", args: args{fileName: "test"}, want: "test"},
-		{name: "with extension", args: args{fileName: "test.txt"}, want: "test"},
-		{name: "with multiple extensions", args: args{fileName: "test.txt.gz"}, want: "test"},
+		{name: "with extension", args: args{fileName: "test.zip"}, want: "test"},
+		{name: "with multiple extensions", args: args{fileName: "test.tar.gz"}, want: "test"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
