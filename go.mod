@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/briandowns/spinner v1.23.1
+	github.com/briandowns/spinner v1.23.2
 	github.com/fatih/color v1.18.0
 	github.com/go-resty/resty/v2 v2.16.2
 	github.com/goccy/go-yaml v1.15.13
