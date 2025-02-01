@@ -56,6 +56,9 @@
         "newVersion": {
           "type": "string"
         },
+        "ignore": {
+          "type": "boolean"
+        },
         "shell": {
           "type": "string"
         }

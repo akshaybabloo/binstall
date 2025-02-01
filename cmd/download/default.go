@@ -61,12 +61,16 @@ func NewDownloadCmd() *cobra.Command {
 			}
 
 			var bins []models.Binaries
-			for binaries, err := range data {
+			for binary, err := range data {
 				if err != nil {
 					return err
 				}
 
-				updates, err := net.CheckUpdates(binaries, token)
+				if binary.Ignore {
+					continue
+				}
+
+				updates, err := net.CheckUpdates(binary, token)
 				if err != nil {
 					return err
 				}
