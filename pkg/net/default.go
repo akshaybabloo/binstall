@@ -78,7 +78,7 @@ func checkForNewVersion(b models.Binaries) (models.Binaries, error) {
 		c := github.NewClient(nil)
 		releases, _, err := c.Repositories.GetLatestRelease(context.Background(), info.Owner, info.Repo)
 		if err != nil {
-			return models.Binaries{}, nil
+			return models.Binaries{}, err
 		}
 
 		for _, asset := range releases.Assets {
