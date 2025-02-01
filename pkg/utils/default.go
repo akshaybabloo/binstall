@@ -90,8 +90,8 @@ func Contains(s []string, e string) bool {
 func FileNameWithoutExtension(fileName string) string {
 	baseName := filepath.Base(fileName)
 	name := strings.TrimSuffix(baseName, filepath.Ext(baseName))
-	for filepath.Ext(name) != "" {
-		name = strings.TrimSuffix(name, filepath.Ext(name))
+	if strings.HasSuffix(name, ".tar") {
+		name = strings.TrimSuffix(name, ".tar")
 	}
 	return name
 }

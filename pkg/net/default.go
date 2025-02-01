@@ -230,6 +230,8 @@ func uncompressFile(b models.Binaries) error {
 	x := &xtractr.XFile{
 		FilePath:  b.DownloadFilePath,
 		OutputDir: b.DownloadFolder,
+		FileMode:  0755,
+		DirMode:   0755,
 	}
 	o1, o2, o3, err := xtractr.ExtractFile(x)
 	if err != nil {
@@ -288,6 +290,7 @@ func moveFiles(b *models.Binaries, path ...string) error {
 		}
 
 		if file.CopyIt {
+			logrus.Debugf("Copying %s to %s\n", srcPath, dstPath)
 			// Move the file
 			err = os.Rename(srcPath, dstPath)
 			if err != nil {
