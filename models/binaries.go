@@ -61,4 +61,7 @@ type Binaries struct {
 
 	// Shell is the shell command to run the binary, if any
 	Shell string `yaml:"shell,omitempty" json:"shell,omitempty"`
+
+	// Token is the token to be used for the download authentication
+	Token string `yaml:"_" json:"_"`
 }

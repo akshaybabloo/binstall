@@ -17,7 +17,7 @@ import (
 	"github.com/akshaybabloo/binstall/pkg"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/hashicorp/go-version"
 	"golift.io/xtractr"
 
@@ -71,11 +71,18 @@ func findProvider(b models.Binaries) models.Binaries {
 	return b
 }
 
-func checkForNewVersion(b models.Binaries) (models.Binaries, error) {
+func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error) {
 	if b.Provider == GitHub {
 		info := utils.ExpandGitHubURL(b.URL)
+		var c *github.Client
 
-		c := github.NewClient(nil)
+		if len(a) > 0 {
+			b.Token = a[0]
+			c = github.NewClient(nil).WithAuthToken(b.Token)
+		} else {
+			c = github.NewClient(nil)
+		}
+
 		releases, _, err := c.Repositories.GetLatestRelease(context.Background(), info.Owner, info.Repo)
 		if err != nil {
 			return models.Binaries{}, err
@@ -106,13 +113,13 @@ func checkForNewVersion(b models.Binaries) (models.Binaries, error) {
 // 2. Find the provider of the binary
 // 3. Check for the new version of the binary
 // 4. Compare the current version with the new version
-func CheckUpdates(b models.Binaries) (models.Binaries, error) {
+func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
 	_version, err := getCurrentVersion(b)
 	if err != nil {
 		// If not found, install the binary
 		if errors.Is(err, exec.ErrNotFound) {
 			pr := findProvider(b)
-			checkV, err := checkForNewVersion(pr)
+			checkV, err := checkForNewVersion(pr, a...)
 			if err != nil {
 				if errors.Is(err, pkg.ErrNetBinaryNotFound) {
 					logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)
@@ -131,7 +138,7 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 	}
 
 	pr := findProvider(_version)
-	checkV, err := checkForNewVersion(pr)
+	checkV, err := checkForNewVersion(pr, a...)
 	if err != nil {
 		if errors.Is(err, pkg.ErrNetBinaryNotFound) {
 			logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)

@@ -21,10 +21,11 @@ import (
 
 var isCheckOnly bool
 var nqa bool
+var token string
 
 // NewDownloadCmd command function to downloads required binaries
 func NewDownloadCmd() *cobra.Command {
-	var deleteCmd = &cobra.Command{
+	var downloadCmd = &cobra.Command{
 		Use:   "download",
 		Short: "Download required binaries",
 		Example: heredoc.Doc(`
@@ -65,7 +66,7 @@ func NewDownloadCmd() *cobra.Command {
 					return err
 				}
 
-				updates, err := net.CheckUpdates(binaries)
+				updates, err := net.CheckUpdates(binaries, token)
 				if err != nil {
 					return err
 				}
@@ -131,8 +132,9 @@ func NewDownloadCmd() *cobra.Command {
 		},
 	}
 
-	deleteCmd.Flags().BoolVar(&isCheckOnly, "check", false, "Check for updates")
-	deleteCmd.Flags().BoolVar(&nqa, "nqa", false, "Update without asking")
+	downloadCmd.Flags().BoolVar(&isCheckOnly, "check", false, "Check for updates")
+	downloadCmd.Flags().BoolVar(&nqa, "nqa", false, "Update without asking")
+	downloadCmd.Flags().StringVarP(&token, "token", "t", "", "GitHub token")
 
-	return deleteCmd
+	return downloadCmd
 }
