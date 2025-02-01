@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/sirupsen/logrus"
 
 	"github.com/akshaybabloo/binstall/pkg"
@@ -216,6 +217,16 @@ func verifyFile(b models.Binaries) (bool, error) {
 func uncompressFile(b models.Binaries) error {
 	if b.DownloadFileName == "" {
 		return errors.New("no file to uncompress")
+	}
+
+	mtype, err := mimetype.DetectFile(b.DownloadFilePath)
+	if err != nil {
+		return errors.New("failed to detect the file type: " + err.Error())
+	}
+	logrus.Debugf("File type: %s, Extension: %s\n", mtype.String(), mtype.Extension())
+
+	if mtype.String() == "application/x-executable" {
+		return nil
 	}
 
 	mediaType, _, err := mime.ParseMediaType(b.ContentType)
