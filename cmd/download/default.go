@@ -3,18 +3,20 @@ package download
 import (
 	"errors"
 	"fmt"
-	"github.com/akshaybabloo/binstall/pkg/fileio"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/akshaybabloo/binstall/pkg/fileio"
+
 	"github.com/MakeNowJust/heredoc"
-	"github.com/akshaybabloo/binstall/models"
-	"github.com/akshaybabloo/binstall/pkg/net"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
+
+	"github.com/akshaybabloo/binstall/models"
+	"github.com/akshaybabloo/binstall/pkg/net"
 )
 
 var isCheckOnly bool

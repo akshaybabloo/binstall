@@ -6,9 +6,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/spf13/cobra"
+
 	"github.com/akshaybabloo/binstall/cmd/download"
 	"github.com/akshaybabloo/binstall/cmd/schema"
-	"github.com/spf13/cobra"
 )
 
 var verbose bool

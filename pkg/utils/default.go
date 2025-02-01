@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/akshaybabloo/binstall/models"
 	"github.com/goccy/go-yaml"
+
+	"github.com/akshaybabloo/binstall/models"
 )
 
 // ParseYaml parses the yaml string and returns the models.Binaries

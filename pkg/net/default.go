@@ -12,20 +12,22 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/akshaybabloo/binstall/pkg"
 	"github.com/sirupsen/logrus"
 
-	"github.com/akshaybabloo/binstall/models"
-	"github.com/akshaybabloo/binstall/pkg/utils"
+	"github.com/akshaybabloo/binstall/pkg"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/google/go-github/v66/github"
 	"github.com/hashicorp/go-version"
 	"golift.io/xtractr"
+
+	"github.com/akshaybabloo/binstall/models"
+	"github.com/akshaybabloo/binstall/pkg/utils"
 )
 
-//===============================================================================
-//==============================  CHECK UPDATES  ================================
-//===============================================================================
+// ===============================================================================
+// ==============================  CHECK UPDATES  ================================
+// ===============================================================================
 
 const (
 	GitHub = iota + 1
@@ -160,9 +162,9 @@ func CheckUpdates(b models.Binaries) (models.Binaries, error) {
 	return checkV, nil
 }
 
-//===============================================================================
-//=========================  DOWNLOAD AND MOVE FILES  ===========================
-//===============================================================================
+// ===============================================================================
+// =========================  DOWNLOAD AND MOVE FILES  ===========================
+// ===============================================================================
 
 func downloadFile(b models.Binaries) (models.Binaries, error) {
 

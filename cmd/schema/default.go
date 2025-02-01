@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/akshaybabloo/binstall/models"
 	"github.com/invopop/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/stoewer/go-strcase"
+
+	"github.com/akshaybabloo/binstall/models"
 )
 
 func NewSchemaCmd() *cobra.Command {

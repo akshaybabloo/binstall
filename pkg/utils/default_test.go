@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/akshaybabloo/binstall/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/akshaybabloo/binstall/models"
 )
 
 func TestExpandGitHubURL(t *testing.T) {
