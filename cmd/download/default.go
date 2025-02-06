@@ -90,7 +90,7 @@ func NewDownloadCmd() *cobra.Command {
 				fmt.Println(color.GreenString("No updates available"))
 				return nil
 			}
-			s.FinalMSG = color.GreenString("Updates available\n")
+			s.FinalMSG = color.GreenString("Updates found\n")
 			s.Stop()
 
 			t := table.NewWriter()
@@ -123,6 +123,7 @@ func NewDownloadCmd() *cobra.Command {
 			s.Start()
 
 			for _, update := range binUpdates {
+				s.Suffix = color.GreenString(fmt.Sprintf(" Installing %s...", update.Name))
 				err = net.DownloadAndMoveFiles(update)
 				if err != nil {
 					return err
