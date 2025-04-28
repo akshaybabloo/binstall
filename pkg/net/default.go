@@ -36,7 +36,7 @@ const (
 )
 
 var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
-var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip-compressed-tar", "raw", "application/x-gtar", "application/octet-stream"}
+var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip1-compressed-tar", "application/x-bzip-compressed-tar", "raw", "application/x-gtar", "application/octet-stream"}
 
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
