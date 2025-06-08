@@ -122,12 +122,25 @@ func NewDownloadCmd() *cobra.Command {
 			s.Suffix = color.GreenString(" Installing updates...")
 			s.Start()
 
+			var errs []error
+
 			for _, update := range binUpdates {
 				s.Suffix = color.GreenString(fmt.Sprintf(" Installing %s...", update.Name))
 				err = net.DownloadAndMoveFiles(update)
 				if err != nil {
-					return err
+					errs = append(errs, fmt.Errorf("failed to update %s:\n%w", update.Name, err))
+					continue
 				}
+			}
+
+			// Stop the spinner and check for errors
+			if len(errs) > 0 {
+				s.Stop()
+				fmt.Println(color.RedString("Some updates failed to install:"))
+				for _, err := range errs {
+					fmt.Println(color.RedString(err.Error()))
+				}
+				return nil
 			}
 
 			s.FinalMSG = color.GreenString("Updates installed\n")
