@@ -48,11 +48,11 @@ func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 				if errors.Is(err, exec.ErrNotFound) {
 					return models.Binaries{}, exec.ErrNotFound
 				}
-				return models.Binaries{}, errors.New("failed to get the current version: " + err.Error())
+				return models.Binaries{}, fmt.Errorf("failed to get the current version for: %s - %s", file.FileName, err.Error())
 			}
 			r, err := regexp.Compile(file.VersionCommand.RegexVersion)
 			if err != nil {
-				return models.Binaries{}, errors.New("failed to compile the regex: " + err.Error())
+				return models.Binaries{}, fmt.Errorf("failed to compile the regex for: %s - %s", file.FileName, err.Error())
 			}
 			if r.MatchString(string(stdout)) {
 				matched := r.FindString(string(stdout))
@@ -123,7 +123,7 @@ func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
 			checkV, err := checkForNewVersion(pr, a...)
 			if err != nil {
 				if errors.Is(err, pkg.ErrNetBinaryNotFound) {
-					logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)
+					logrus.Debugf("No binary found for the current OS and Arch: %s\n", b.Name)
 					return models.Binaries{}, nil
 				}
 				return models.Binaries{}, err
@@ -142,10 +142,10 @@ func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
 	checkV, err := checkForNewVersion(pr, a...)
 	if err != nil {
 		if errors.Is(err, pkg.ErrNetBinaryNotFound) {
-			logrus.Debugf("No binary found for the current OS and Arch %s\n", b.Name)
+			logrus.Debugf("No binary found for the current OS and Arch: %s\n", b.Name)
 			return models.Binaries{}, nil
 		}
-		return models.Binaries{}, errors.New("error checking for new version: " + err.Error())
+		return models.Binaries{}, fmt.Errorf("error checking for new version for: %s - %s", b.Name, err.Error())
 	}
 	if checkV.CurrentVersion == "" {
 		checkV.CurrentVersion = "0.0.0"
@@ -153,12 +153,12 @@ func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
 
 	currentVersion, err := version.NewVersion(checkV.CurrentVersion)
 	if err != nil {
-		return models.Binaries{}, fmt.Errorf("error parsing the current version for %s: %w ", b.Name, err)
+		return models.Binaries{}, fmt.Errorf("error parsing the current version for: %s - %w ", b.Name, err)
 	}
 
 	newVersion, err := version.NewVersion(checkV.NewVersion)
 	if err != nil {
-		return models.Binaries{}, fmt.Errorf("error parsing the new version for %s: %w ", b.Name, err)
+		return models.Binaries{}, fmt.Errorf("error parsing the new version for: %s - %w ", b.Name, err)
 	}
 
 	if currentVersion.LessThan(newVersion) {
@@ -182,7 +182,7 @@ func downloadFile(b models.Binaries) (models.Binaries, error) {
 	client := resty.New()
 	_, err := client.R().SetOutput(b.DownloadFilePath).Get(b.DownloadURL)
 	if err != nil {
-		return models.Binaries{}, errors.New("failed to download the file: " + err.Error())
+		return models.Binaries{}, fmt.Errorf("failed to download the file for: %s - %s", b.Name, err.Error())
 	}
 	return b, nil
 }
@@ -193,20 +193,20 @@ func verifyFile(b models.Binaries) (bool, error) {
 		client := resty.New()
 		r, err := client.R().Get(b.Sha.URL)
 		if err != nil {
-			return false, errors.New("failed to get the checksum file: " + err.Error())
+			return false, fmt.Errorf("failed to get the checksum file for: %s - %s", b.Name, err.Error())
 		}
 
 		shaStr := string(r.Body())
 
 		if b.Sha.ShaType == "" {
-			return false, errors.New("no sha type provided")
+			return false, fmt.Errorf("no sha type provided for: %s", b.Name)
 		} else if b.Sha.ShaType == "sha256" {
 			sha256, err := utils.CalculateSHA256(b.DownloadFilePath)
 			if err != nil {
-				return false, errors.New("failed to calculate the sha256: " + err.Error())
+				return false, fmt.Errorf("failed to calculate the sha256 checksum for: %s - %s", b.Name, err.Error())
 			}
 			if sha256 != shaStr {
-				return false, errors.New("checksums do not match")
+				return false, fmt.Errorf("checksums do not match for: %s\nExpected: %s\nGot: %s", b.Name, shaStr, sha256)
 			}
 		}
 	}
@@ -216,12 +216,12 @@ func verifyFile(b models.Binaries) (bool, error) {
 
 func uncompressFile(b models.Binaries) error {
 	if b.DownloadFileName == "" {
-		return errors.New("no file to uncompress")
+		return fmt.Errorf("no file to uncompress for: %s", b.Name)
 	}
 
 	mtype, err := mimetype.DetectFile(b.DownloadFilePath)
 	if err != nil {
-		return errors.New("failed to detect the file type: " + err.Error())
+		return fmt.Errorf("failed to detect the file type for: %s - %s", b.Name, err.Error())
 	}
 	logrus.Debugf("File type: %s, Extension: %s\n", mtype.String(), mtype.Extension())
 
@@ -246,7 +246,7 @@ func uncompressFile(b models.Binaries) error {
 	}
 	o1, o2, o3, err := xtractr.ExtractFile(x)
 	if err != nil {
-		return errors.New("failed to uncompress the file: " + err.Error())
+		return fmt.Errorf("failed to uncompress the file for: %s - %s", b.Name, err.Error())
 	}
 	logrus.Debugf("Size %d, %v files, %v files\n", o1, o2, o3)
 	return nil
@@ -257,7 +257,7 @@ func moveFiles(b *models.Binaries, path ...string) error {
 	if strings.HasPrefix(b.InstallLocation, "~/") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return fmt.Errorf("failed to get user home directory: %w", err)
+			return fmt.Errorf("failed to get user home directory for install location: %w", err)
 		}
 		b.InstallLocation = filepath.Join(homeDir, b.InstallLocation[2:])
 	}
@@ -265,7 +265,7 @@ func moveFiles(b *models.Binaries, path ...string) error {
 	// Ensure the installation location exists
 	err := os.MkdirAll(b.InstallLocation, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to create install directory: %w", err)
+		return fmt.Errorf("failed to create install directory %s: %w", b.InstallLocation, err)
 	}
 
 	for _, file := range b.Files {
@@ -312,7 +312,7 @@ func moveFiles(b *models.Binaries, path ...string) error {
 					srcPath = filepath.Join(b.DownloadFolder, f, pathParts[len(pathParts)-1])
 					err = os.Rename(srcPath, dstPath)
 					if err != nil {
-						return fmt.Errorf("file not found even after path adjustment: %w", err)
+						return fmt.Errorf("file not found even after path adjustment: %s to %s: %w", srcPath, dstPath, err)
 					}
 				} else {
 					return fmt.Errorf("failed to move file from %s to %s: %w", srcPath, dstPath, err)
