@@ -252,7 +252,7 @@ func uncompressFile(b models.Binaries) error {
 	return nil
 }
 
-func moveFiles(b *models.Binaries, path ...string) error {
+func moveFiles(b *models.Binaries) error {
 	// Expand the ~ to the home directory
 	if strings.HasPrefix(b.InstallLocation, "~/") {
 		homeDir, err := os.UserHomeDir()

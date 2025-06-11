@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/akshaybabloo/binstall/pkg/fileio"
@@ -22,6 +23,8 @@ import (
 var isCheckOnly bool
 var nqa bool
 var token string
+var excludeBinaries []string
+var includeBinaries []string
 
 // NewDownloadCmd command function to downloads required binaries
 func NewDownloadCmd() *cobra.Command {
@@ -70,6 +73,14 @@ func NewDownloadCmd() *cobra.Command {
 					continue
 				}
 
+				if len(includeBinaries) > 0 && slices.Contains(excludeBinaries, binary.Name) {
+					continue
+				}
+
+				if len(includeBinaries) > 0 && !slices.Contains(includeBinaries, binary.Name) {
+					continue
+				}
+
 				updates, err := net.CheckUpdates(binary, token)
 				if err != nil {
 					return err
@@ -97,7 +108,7 @@ func NewDownloadCmd() *cobra.Command {
 			t.SetOutputMirror(os.Stdout)
 			t.AppendHeader(table.Row{"Name", "Current Version", "New Version"})
 			for _, update := range binUpdates {
-				t.AppendRow([]interface{}{update.Name, update.CurrentVersion, update.NewVersion})
+				t.AppendRow([]any{update.Name, update.CurrentVersion, update.NewVersion})
 			}
 			t.SetStyle(table.StyleLight)
 			t.Render()
@@ -153,6 +164,8 @@ func NewDownloadCmd() *cobra.Command {
 	downloadCmd.Flags().BoolVar(&isCheckOnly, "check", false, "Check for updates")
 	downloadCmd.Flags().BoolVar(&nqa, "nqa", false, "Update without asking")
 	downloadCmd.Flags().StringVarP(&token, "token", "t", "", "GitHub token")
+	downloadCmd.Flags().StringSliceVarP(&excludeBinaries, "exclude", "e", []string{}, "Exclude binaries from update")
+	downloadCmd.Flags().StringSliceVarP(&includeBinaries, "include", "i", []string{}, "Include only specified binaries in update")
 
 	return downloadCmd
 }
