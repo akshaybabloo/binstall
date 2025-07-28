@@ -3,8 +3,10 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
+	"regexp/syntax"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -144,4 +146,23 @@ func TestFileNameWithoutExtension(t *testing.T) {
 			assert.Equalf(t, tt.want, FileNameWithoutExtension(tt.args.fileName), "FileNameWithoutExtension(%v)", tt.args.fileName)
 		})
 	}
+}
+
+func FuzzExtractVersion(f *testing.F) {
+	f.Add("app version v1.2", "v(\\d+\\.\\d+)")
+	f.Add("1.2.3", "\\d+\\.\\d+\\.\\d+")
+	f.Add("the version 10 is the latest", "version (\\d+)")
+	f.Add("invalid regex", "[") // A known-bad regex pattern
+	f.Add("", "")               // Empty inputs
+
+	f.Fuzz(func(t *testing.T, regexPattern string, inputString string) {
+		t.Parallel()
+		_, err := ExtractVersion(regexPattern, inputString)
+		if err != nil {
+			var syntaxError *syntax.Error
+			if !errors.As(err, &syntaxError) {
+				t.Errorf("Expected a regexp.Error but got %T", err)
+			}
+		}
+	})
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -36,6 +37,8 @@ func ExpandGitHubURL(url string) models.GitHubInfo {
 // FigureOutOSAndArch figures out the OS and Arch of the system
 func FigureOutOSAndArch(f string) models.OSArch {
 	var osArch models.OSArch
+
+	f = strings.ToLower(f)
 
 	if strings.Contains(f, "linux") {
 		osArch.OS = "linux"
@@ -94,4 +97,31 @@ func FileNameWithoutExtension(fileName string) string {
 		name = strings.TrimSuffix(name, ".tar")
 	}
 	return name
+}
+
+// ExtractVersion extracts the version from a string using a regex pattern
+func ExtractVersion(version, regex string) (string, error) {
+	r, err := regexp.Compile(regex)
+	if err != nil {
+		return "", err
+	}
+
+	matches := r.FindStringSubmatch(version)
+	if len(matches) > 0 {
+		matched := strings.TrimSpace(matches[0])
+
+		regex, err := regexp.Compile("\\s+")
+		if err != nil {
+			return "", err
+		}
+		splitStr := regex.Split(matched, -1)
+		if len(splitStr) > 1 {
+			// If the version is in the format "Somethis v1.0.0"
+			matched = splitStr[1]
+		} else {
+			matched = splitStr[0]
+		}
+		return matched, nil
+	}
+	return "", nil
 }
