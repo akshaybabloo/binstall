@@ -81,6 +81,10 @@ func NewDownloadCmd() *cobra.Command {
 					continue
 				}
 
+				if token == "" && os.Getenv("GITHUB_TOKEN") != "" {
+					token = os.Getenv("GITHUB_TOKEN")
+				}
+
 				updates, err := net.CheckUpdates(binary, token)
 				if err != nil {
 					return err

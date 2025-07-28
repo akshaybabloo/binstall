@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -50,14 +49,11 @@ func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 				}
 				return models.Binaries{}, fmt.Errorf("failed to get the current version for: %s - %s", file.FileName, err.Error())
 			}
-			r, err := regexp.Compile(file.VersionCommand.RegexVersion)
+			ver, err := utils.ExtractVersion(string(stdout), file.VersionCommand.RegexVersion)
 			if err != nil {
 				return models.Binaries{}, fmt.Errorf("failed to compile the regex for: %s - %s", file.FileName, err.Error())
 			}
-			if r.MatchString(string(stdout)) {
-				matched := r.FindString(string(stdout))
-				b.CurrentVersion = matched
-			}
+			b.CurrentVersion = ver
 		}
 	}
 	return b, nil
@@ -381,14 +377,9 @@ func verifyNewBin(b models.Binaries) error {
 			return fmt.Errorf("failed to execute %s: %w\nOutput: %s", fullPath, err, stdout)
 		}
 
-		r, err := regexp.Compile(file.VersionCommand.RegexVersion)
+		match, err := utils.ExtractVersion(string(stdout), file.VersionCommand.RegexVersion)
 		if err != nil {
 			return fmt.Errorf("failed to compile regex for %s: %w", file.FileName, err)
-		}
-
-		match := r.FindString(string(stdout))
-		if match == "" {
-			return fmt.Errorf("version not found in output for %s. Output: %s", file.FileName, stdout)
 		}
 
 		installedVersion, err := version.NewVersion(strings.TrimSpace(match))
