@@ -122,13 +122,13 @@ func NewDownloadCmd() *cobra.Command {
 			}
 
 			if !nqa {
-				fmt.Print("Do you want to update? (y/n): ")
+				fmt.Print("Do you want to update? (Y/n): ")
 				var input string
 				_, err := fmt.Scanln(&input)
 				if err != nil {
 					return err
 				}
-				if input != "y" {
+				if input == "no" || input == "n" || input == "N" {
 					return nil
 				}
 			}
