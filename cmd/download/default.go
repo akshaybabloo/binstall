@@ -126,9 +126,9 @@ func NewDownloadCmd() *cobra.Command {
 				var input string
 				_, err := fmt.Scanln(&input)
 				if err != nil {
-					return err
+					input = ""
 				}
-				if input == "no" || input == "n" || input == "N" {
+				if input != "" && (input == "no" || input == "n" || input == "N") {
 					return nil
 				}
 			}
