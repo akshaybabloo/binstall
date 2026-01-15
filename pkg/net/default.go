@@ -335,10 +335,14 @@ func moveFiles(b *models.Binaries) error {
 			err = os.Rename(srcPath, dstPath)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					// Try to adjust the path, this seems to happen with xz files
-					pathParts := strings.Split(srcPath, "/")
+					// Try to adjust the path - archives often extract to a versioned subdirectory
 					f := utils.FileNameWithoutExtension(b.DownloadFileName)
-					srcPath = filepath.Join(b.DownloadFolder, f, pathParts[len(pathParts)-1])
+					// Use sourcePath if available, otherwise just the fileName
+					relativePath := file.FileName
+					if file.SourcePath != "" {
+						relativePath = file.SourcePath
+					}
+					srcPath = filepath.Join(b.DownloadFolder, f, relativePath)
 					err = os.Rename(srcPath, dstPath)
 					if err != nil {
 						return fmt.Errorf("file not found even after path adjustment: %s to %s: %w", srcPath, dstPath, err)
