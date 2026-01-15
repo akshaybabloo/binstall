@@ -8,8 +8,9 @@ type VersionCommand struct {
 
 // File holds the information about the binary files
 type File struct {
-	Execute            bool           `yaml:"execute,omitempty" json:"execute"`
+	CheckVersion       bool           `yaml:"checkVersion,omitempty" json:"checkVersion"`
 	FileName           string         `yaml:"fileName,omitempty" json:"fileName"`
+	SourcePath         string         `yaml:"sourcePath,omitempty" json:"sourcePath,omitempty"` // Path inside archive (if different from fileName)
 	Exists             bool           `yaml:"exists,omitempty" json:"exists,omitempty"`
 	CopyIt             bool           `yaml:"copyIt" json:"copyIt"`                         // Copy the binary to the install location
 	RenameTo           string         `yaml:"renameTo,omitempty" json:"renameTo,omitempty"` // Rename the binary to this name

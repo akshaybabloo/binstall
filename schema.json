@@ -74,10 +74,13 @@
     },
     "File": {
       "properties": {
-        "execute": {
+        "checkVersion": {
           "type": "boolean"
         },
         "fileName": {
+          "type": "string"
+        },
+        "sourcePath": {
           "type": "string"
         },
         "exists": {
@@ -99,7 +102,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "execute",
+        "checkVersion",
         "fileName",
         "copyIt"
       ]

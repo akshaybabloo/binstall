@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/akshaybabloo/binstall/pkg/fileio"
@@ -22,6 +23,8 @@ import (
 
 var isCheckOnly bool
 var nqa bool
+var dryRun bool
+var parallelCount int
 var token string
 var excludeBinaries []string
 var includeBinaries []string
@@ -73,7 +76,7 @@ func NewDownloadCmd() *cobra.Command {
 					continue
 				}
 
-				if len(includeBinaries) > 0 && slices.Contains(excludeBinaries, binary.Name) {
+				if len(excludeBinaries) > 0 && slices.Contains(excludeBinaries, binary.Name) {
 					continue
 				}
 
@@ -117,7 +120,31 @@ func NewDownloadCmd() *cobra.Command {
 			t.SetStyle(table.StyleLight)
 			t.Render()
 
-			if isCheckOnly {
+			if isCheckOnly || dryRun {
+				if dryRun {
+					fmt.Println("\n--- Dry Run Summary ---")
+					for _, update := range binUpdates {
+						fmt.Printf("\nBinary: %s\n", update.Name)
+						fmt.Printf("  Current Version: %s\n", update.CurrentVersion)
+						fmt.Printf("  New Version: %s\n", update.NewVersion)
+						fmt.Printf("  Download URL: %s\n", update.DownloadURL)
+						fmt.Printf("  Install Location: %s\n", update.InstallLocation)
+						fmt.Printf("  Files:\n")
+						for _, file := range update.Files {
+							if file.CopyIt {
+								destName := file.FileName
+								if file.RenameTo != "" {
+									destName = file.RenameTo
+								}
+								srcName := file.FileName
+								if file.SourcePath != "" {
+									srcName = file.SourcePath
+								}
+								fmt.Printf("    - %s -> %s\n", srcName, destName)
+							}
+						}
+					}
+				}
 				return nil
 			}
 
@@ -137,14 +164,57 @@ func NewDownloadCmd() *cobra.Command {
 			s.Suffix = color.GreenString(" Installing updates...")
 			s.Start()
 
-			var errs []error
+			// Result type for download operations
+			type downloadResult struct {
+				name string
+				err  error
+			}
 
+			resultCh := make(chan downloadResult, len(binUpdates))
+			workCh := make(chan models.Binaries, len(binUpdates))
+
+			// Determine number of workers
+			numWorkers := parallelCount
+			if numWorkers < 1 {
+				numWorkers = 1
+			}
+			if numWorkers > len(binUpdates) {
+				numWorkers = len(binUpdates)
+			}
+
+			// Start workers
+			var wg sync.WaitGroup
+			for i := 0; i < numWorkers; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for update := range workCh {
+						err := net.DownloadAndMoveFiles(update)
+						resultCh <- downloadResult{name: update.Name, err: err}
+					}
+				}()
+			}
+
+			// Send work
 			for _, update := range binUpdates {
-				s.Suffix = color.GreenString(fmt.Sprintf(" Installing %s...", update.Name))
-				err = net.DownloadAndMoveFiles(update)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("failed to update %s:\n%w", update.Name, err))
-					continue
+				workCh <- update
+			}
+			close(workCh)
+
+			// Wait for completion in a goroutine
+			go func() {
+				wg.Wait()
+				close(resultCh)
+			}()
+
+			// Collect results
+			var errs []error
+			completed := 0
+			for result := range resultCh {
+				completed++
+				s.Suffix = color.GreenString(fmt.Sprintf(" Installing updates... (%d/%d)", completed, len(binUpdates)))
+				if result.err != nil {
+					errs = append(errs, fmt.Errorf("failed to update %s:\n%w", result.name, result.err))
 				}
 			}
 
@@ -167,6 +237,8 @@ func NewDownloadCmd() *cobra.Command {
 
 	downloadCmd.Flags().BoolVar(&isCheckOnly, "check", false, "Check for updates")
 	downloadCmd.Flags().BoolVar(&nqa, "nqa", false, "Update without asking")
+	downloadCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be installed without making changes")
+	downloadCmd.Flags().IntVarP(&parallelCount, "parallel", "p", 4, "Number of parallel downloads")
 	downloadCmd.Flags().StringVarP(&token, "token", "t", "", "GitHub token")
 	downloadCmd.Flags().StringSliceVarP(&excludeBinaries, "exclude", "e", []string{}, "Exclude binaries from update")
 	downloadCmd.Flags().StringSliceVarP(&includeBinaries, "include", "i", []string{}, "Include only specified binaries in update")

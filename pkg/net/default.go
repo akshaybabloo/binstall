@@ -40,7 +40,7 @@ var allowedMediaTypes = []string{"application/gzip", "application/zip", "applica
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
 		file := &b.Files[i]
-		if file.Execute {
+		if file.CheckVersion {
 			cmd := exec.Command(file.FileName, file.VersionCommand.Args)
 			stdout, err := cmd.Output()
 			if err != nil {
@@ -183,30 +183,60 @@ func downloadFile(b models.Binaries) (models.Binaries, error) {
 	return b, nil
 }
 
-// TODO: Implement this function
 func verifyFile(b models.Binaries) (bool, error) {
+	// First check inline checksum
+	if b.Sha.Checksum != "" {
+		shaType := b.Sha.ShaType
+		if shaType == "" {
+			shaType = "sha256"
+		}
+		if shaType == "sha256" {
+			calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
+			if err != nil {
+				return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
+			}
+			expected := strings.ToLower(strings.TrimSpace(b.Sha.Checksum))
+			if strings.ToLower(calculated) != expected {
+				return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
+			}
+			return true, nil
+		}
+	}
+
+	// Then check URL-based checksum
 	if b.Sha.URL != "" {
 		client := resty.New()
 		r, err := client.R().Get(b.Sha.URL)
 		if err != nil {
-			return false, fmt.Errorf("failed to get the checksum file for: %s - %s", b.Name, err.Error())
+			return false, fmt.Errorf("failed to get checksum file for %s: %w", b.Name, err)
 		}
 
-		shaStr := string(r.Body())
+		shaContent := string(r.Body())
 
 		if b.Sha.ShaType == "" {
 			return false, fmt.Errorf("no sha type provided for: %s", b.Name)
-		} else if b.Sha.ShaType == "sha256" {
-			sha256, err := utils.CalculateSHA256(b.DownloadFilePath)
+		}
+
+		if b.Sha.ShaType == "sha256" {
+			calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
 			if err != nil {
-				return false, fmt.Errorf("failed to calculate the sha256 checksum for: %s - %s", b.Name, err.Error())
+				return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
 			}
-			if sha256 != shaStr {
-				return false, fmt.Errorf("checksums do not match for: %s\nExpected: %s\nGot: %s", b.Name, shaStr, sha256)
+
+			// Parse the SHA file to extract the checksum
+			expected := utils.ParseSHAFile(shaContent, b.DownloadFileName)
+			if expected == "" {
+				return false, fmt.Errorf("could not parse checksum from SHA file for %s", b.Name)
 			}
+
+			if strings.ToLower(calculated) != expected {
+				return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
+			}
+			return true, nil
 		}
 	}
-	// Skip the checksum verification
+
+	// No checksum verification configured - pass
 	return true, nil
 }
 
@@ -266,6 +296,9 @@ func moveFiles(b *models.Binaries) error {
 
 	for _, file := range b.Files {
 		srcPath := filepath.Join(b.DownloadFolder, file.FileName)
+		if file.SourcePath != "" {
+			srcPath = filepath.Join(b.DownloadFolder, file.SourcePath)
+		}
 		dstPath := filepath.Join(b.InstallLocation, file.FileName)
 		if file.RenameTo != "" {
 			dstPath = filepath.Join(b.InstallLocation, file.RenameTo)
@@ -276,7 +309,7 @@ func moveFiles(b *models.Binaries) error {
 		var stdout []byte
 		if file.ExecuteWhenCopying {
 
-			if file.Execute || !file.CopyIt {
+			if file.CheckVersion || !file.CopyIt {
 				cmd = exec.Command(srcPath, file.VersionCommand.Args)
 				stdout, err := cmd.CombinedOutput()
 				if err != nil {
@@ -332,7 +365,7 @@ func moveFiles(b *models.Binaries) error {
 				return fmt.Errorf("failed to get file info for %s: %w", dstPath, err)
 			}
 
-			if file.Execute {
+			if file.CheckVersion {
 				// Check version after move
 				cmd = exec.Command(dstPath, file.VersionCommand.Args)
 				stdout, err = cmd.CombinedOutput()
@@ -348,7 +381,7 @@ func moveFiles(b *models.Binaries) error {
 
 func verifyNewBin(b models.Binaries) error {
 	for _, file := range b.Files {
-		if !file.Execute {
+		if !file.CheckVersion {
 			continue
 		}
 

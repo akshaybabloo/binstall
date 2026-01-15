@@ -148,6 +148,83 @@ func TestFileNameWithoutExtension(t *testing.T) {
 	}
 }
 
+func TestParseSHAFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		filename string
+		expected string
+	}{
+		{
+			name:     "GNU coreutils format (two spaces)",
+			content:  "abc123def456  myfile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Binary mode format",
+			content:  "abc123def456 *myfile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Single space format",
+			content:  "abc123def456 myfile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Multi-line file",
+			content:  "aaa111  file1.tar.gz\nbbb222  file2.tar.gz\nccc333  file3.tar.gz",
+			filename: "file2.tar.gz",
+			expected: "bbb222",
+		},
+		{
+			name:     "Hash only (single file checksum)",
+			content:  "abc123def456",
+			filename: "anything.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Case insensitive filename match",
+			content:  "ABC123DEF456  MyFile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Case insensitive hash returned",
+			content:  "ABC123DEF456  myfile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+		{
+			name:     "Not found in multi-line",
+			content:  "abc123  other.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "",
+		},
+		{
+			name:     "Empty content",
+			content:  "",
+			filename: "myfile.tar.gz",
+			expected: "",
+		},
+		{
+			name:     "With path prefix in SHA file",
+			content:  "abc123def456  ./dist/myfile.tar.gz",
+			filename: "myfile.tar.gz",
+			expected: "abc123def456",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ParseSHAFile(tt.content, tt.filename)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func FuzzExtractVersion(f *testing.F) {
 	f.Add("app version v1.2", "v(\\d+\\.\\d+)")
 	f.Add("1.2.3", "\\d+\\.\\d+\\.\\d+")

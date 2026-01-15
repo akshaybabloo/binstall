@@ -79,6 +79,49 @@ func CalculateSHA256(filePath string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
+// ParseSHAFile extracts the checksum for a given filename from SHA file content.
+// Handles formats like:
+//   - "hash  filename" (GNU coreutils)
+//   - "hash *filename" (binary mode)
+//   - "hash filename" (single space)
+//   - Multi-line files with multiple entries
+//
+// Returns the checksum (lowercase) or empty string if not found.
+func ParseSHAFile(content string, targetFilename string) string {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	targetFilename = strings.ToLower(filepath.Base(targetFilename))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Try to parse "hash  filename" or "hash *filename" format
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			hash := strings.ToLower(parts[0])
+			filename := strings.ToLower(strings.TrimPrefix(parts[1], "*"))
+			filename = filepath.Base(filename)
+
+			if filename == targetFilename {
+				return hash
+			}
+		} else if len(parts) == 1 {
+			// Single hash on a line - return it for single-file checksum files
+			return strings.ToLower(parts[0])
+		}
+	}
+
+	// If no match found but content looks like a single hash, return it
+	content = strings.TrimSpace(content)
+	if !strings.Contains(content, "\n") && !strings.Contains(content, " ") {
+		return strings.ToLower(content)
+	}
+
+	return ""
+}
+
 // Contains checks if a string is in a slice
 func Contains(s []string, e string) bool {
 	for _, a := range s {
