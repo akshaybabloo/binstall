@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/go-version v1.8.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jedib0t/go-pretty/v6 v6.7.8
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stoewer/go-strcase v1.3.1
 	github.com/stretchr/testify v1.11.1
