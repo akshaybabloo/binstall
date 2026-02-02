@@ -6,7 +6,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/fatih/color v1.18.0
-	github.com/gabriel-vasile/mimetype v1.4.12
+	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-resty/resty/v2 v2.17.1
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v68 v68.0.0
