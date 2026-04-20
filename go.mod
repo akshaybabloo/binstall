@@ -1,6 +1,6 @@
 module github.com/akshaybabloo/binstall
 
-go 1.25.7
+go 1.26
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
