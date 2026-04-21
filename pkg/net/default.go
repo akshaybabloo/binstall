@@ -37,6 +37,36 @@ const (
 var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
 var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip1-compressed-tar", "application/x-bzip-compressed-tar", "raw", "application/x-gtar", "application/octet-stream"}
 
+// resolveDownloadFileName checks the Binaries.Download config for an explicit file name
+// matching the current OS/arch. Returns the rendered file name, or empty string if none configured.
+func resolveDownloadFileName(b models.Binaries, tagName string) string {
+	if b.Download == nil {
+		return ""
+	}
+
+	archMap, ok := b.Download[runtime.GOOS]
+	if !ok {
+		return ""
+	}
+
+	// Look up arch entry, normalizing the config key to match runtime.GOARCH
+	for archKey, info := range archMap {
+		if utils.NormalizeArch(archKey) == runtime.GOARCH {
+			if info.FileName == "" {
+				return ""
+			}
+			rendered, err := utils.RenderDownloadTemplate(info.FileName, tagName)
+			if err != nil {
+				logrus.Warnf("Failed to render download template for %s: %v", b.Name, err)
+				return ""
+			}
+			return rendered
+		}
+	}
+
+	return ""
+}
+
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 	for i := range b.Files {
 		file := &b.Files[i]
@@ -85,16 +115,34 @@ func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error)
 			return models.Binaries{}, err
 		}
 
-		for _, asset := range releases.Assets {
-			osArch := utils.FigureOutOSAndArch(asset.GetName())
-			ext := filepath.Ext(asset.GetName())
-			if runtime.GOOS == osArch.OS && runtime.GOARCH == osArch.Arch && !utils.Contains(ignoreFileExt, ext) {
-				b.DownloadURL = asset.GetBrowserDownloadURL()
-				b.NewVersion = releases.GetTagName()
-				b.DownloadFileName = asset.GetName()
-				b.ContentType = asset.GetContentType()
-				b.OsInfo = osArch
-				break
+		// Check if there's a configured download entry for the current OS/arch
+		downloadFileName := resolveDownloadFileName(b, releases.GetTagName())
+
+		if downloadFileName != "" {
+			// Use the configured download file name to find the matching asset
+			for _, asset := range releases.Assets {
+				if asset.GetName() == downloadFileName {
+					b.DownloadURL = asset.GetBrowserDownloadURL()
+					b.NewVersion = releases.GetTagName()
+					b.DownloadFileName = asset.GetName()
+					b.ContentType = asset.GetContentType()
+					b.OsInfo = models.OSArch{OS: runtime.GOOS, Arch: runtime.GOARCH}
+					break
+				}
+			}
+		} else {
+			// Fall back to auto-detection from release asset filenames
+			for _, asset := range releases.Assets {
+				osArch := utils.FigureOutOSAndArch(asset.GetName())
+				ext := filepath.Ext(asset.GetName())
+				if runtime.GOOS == osArch.OS && runtime.GOARCH == osArch.Arch && !utils.Contains(ignoreFileExt, ext) {
+					b.DownloadURL = asset.GetBrowserDownloadURL()
+					b.NewVersion = releases.GetTagName()
+					b.DownloadFileName = asset.GetName()
+					b.ContentType = asset.GetContentType()
+					b.OsInfo = osArch
+					break
+				}
 			}
 		}
 	}

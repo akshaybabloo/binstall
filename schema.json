@@ -11,6 +11,15 @@
         "url": {
           "type": "string"
         },
+        "download": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/DownloadArchInfo"
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
         "files": {
           "items": {
             "$ref": "#/$defs/File"
@@ -71,6 +80,15 @@
         "files",
         "installLocation"
       ]
+    },
+    "DownloadArchInfo": {
+      "properties": {
+        "fileName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "File": {
       "properties": {
