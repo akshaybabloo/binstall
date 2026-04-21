@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/invopop/jsonschema"
+	"github.com/akshaybabloo/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/stoewer/go-strcase"
 

@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
+	github.com/akshaybabloo/jsonschema v0.0.0-20260421023746-90eeaf9de48d
 	github.com/briandowns/spinner v1.23.2
 	github.com/fatih/color v1.19.0
 	github.com/gabriel-vasile/mimetype v1.4.13
@@ -11,7 +12,6 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v85 v85.0.0
 	github.com/hashicorp/go-version v1.9.0
-	github.com/invopop/jsonschema v0.13.0
 	github.com/jedib0t/go-pretty/v6 v6.7.9
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
