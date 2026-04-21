@@ -18,6 +18,12 @@ type File struct {
 	VersionCommand     VersionCommand `yaml:"versionCommand,omitempty" json:"versionCommand,omitempty"`
 }
 
+// DownloadArchInfo holds the download file name for a specific OS/arch combination.
+// The FileName field supports Go text/template syntax, e.g. "bat-{{.Version}}-x86_64-unknown-linux-gnu.tar.gz"
+type DownloadArchInfo struct {
+	FileName string `yaml:"fileName,omitempty" json:"fileName,omitempty"`
+}
+
 // ShaInfo holds the information about the SHA checksum
 // If a binary has a pre-existing checksum, it will be used
 // to verify the downloaded binary using the ShaInfo.url
@@ -43,22 +49,23 @@ type OSArch struct {
 
 // Binaries holds the information about the binaries
 type Binaries struct {
-	Name             string  `yaml:"name,omitempty" json:"name"`
-	URL              string  `yaml:"url,omitempty" json:"url"`
-	Files            []File  `yaml:"files,omitempty" json:"files"`
-	Sha              ShaInfo `yaml:"sha,omitempty" json:"sha,omitempty"`
-	UpdatesAvailable bool    `yaml:"updatesAvailable,omitempty" json:"updatesAvailable,omitempty"`
-	Description      string  `yaml:"description,omitempty" json:"description,omitempty"`
-	Provider         int     `yaml:"provider,omitempty" json:"provider,omitempty"`
-	OsInfo           OSArch  `yaml:"osInfo,omitempty" json:"osInfo,omitempty"`
-	DownloadURL      string  `yaml:"downloadURL,omitempty" json:"downloadURL,omitempty"`
-	DownloadFileName string  `yaml:"downloadFileName,omitempty" json:"downloadFileName,omitempty"`
-	ContentType      string  `yaml:"contentType,omitempty" json:"contentType,omitempty"`
-	DownloadFolder   string  `yaml:"downloadFolder,omitempty" json:"downloadFolder,omitempty"`
-	DownloadFilePath string  `yaml:"downloadPath,omitempty" json:"downloadPath,omitempty"`
-	InstallLocation  string  `yaml:"installLocation" json:"installLocation"`
-	CurrentVersion   string  `yaml:"currentVersion,omitempty" json:"currentVersion,omitempty"`
-	NewVersion       string  `yaml:"newVersion,omitempty" json:"newVersion,omitempty"`
+	Name             string                                 `yaml:"name,omitempty" json:"name"`
+	URL              string                                 `yaml:"url,omitempty" json:"url"`
+	Download         map[string]map[string]DownloadArchInfo `yaml:"download,omitempty" json:"download,omitempty"`
+	Files            []File                                 `yaml:"files,omitempty" json:"files"`
+	Sha              ShaInfo                                `yaml:"sha,omitempty" json:"sha,omitempty"`
+	UpdatesAvailable bool                                   `yaml:"updatesAvailable,omitempty" json:"updatesAvailable,omitempty"`
+	Description      string                                 `yaml:"description,omitempty" json:"description,omitempty"`
+	Provider         int                                    `yaml:"provider,omitempty" json:"provider,omitempty"`
+	OsInfo           OSArch                                 `yaml:"osInfo,omitempty" json:"osInfo,omitempty"`
+	DownloadURL      string                                 `yaml:"downloadURL,omitempty" json:"downloadURL,omitempty"`
+	DownloadFileName string                                 `yaml:"downloadFileName,omitempty" json:"downloadFileName,omitempty"`
+	ContentType      string                                 `yaml:"contentType,omitempty" json:"contentType,omitempty"`
+	DownloadFolder   string                                 `yaml:"downloadFolder,omitempty" json:"downloadFolder,omitempty"`
+	DownloadFilePath string                                 `yaml:"downloadPath,omitempty" json:"downloadPath,omitempty"`
+	InstallLocation  string                                 `yaml:"installLocation" json:"installLocation"`
+	CurrentVersion   string                                 `yaml:"currentVersion,omitempty" json:"currentVersion,omitempty"`
+	NewVersion       string                                 `yaml:"newVersion,omitempty" json:"newVersion,omitempty"`
 
 	// Ignore if the binary should be ignored
 	Ignore bool `yaml:"ignore,omitempty" json:"ignore,omitempty"`

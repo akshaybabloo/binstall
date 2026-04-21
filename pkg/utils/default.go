@@ -2,13 +2,16 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"github.com/goccy/go-yaml"
 
@@ -167,4 +170,37 @@ func ExtractVersion(version, regex string) (string, error) {
 		return matched, nil
 	}
 	return "", nil
+}
+
+// NormalizeArch normalizes architecture names to Go's runtime.GOARCH values
+func NormalizeArch(arch string) string {
+	switch strings.ToLower(arch) {
+	case "amd64", "x86_64":
+		return "amd64"
+	case "arm64", "aarch64":
+		return "arm64"
+	case "386", "i386", "i686":
+		return "386"
+	default:
+		return strings.ToLower(arch)
+	}
+}
+
+// TemplateData holds the data available to download fileName templates
+type TemplateData struct {
+	Version string
+}
+
+// RenderDownloadTemplate renders a Go text/template string with the given version.
+// Returns the input unchanged if it contains no template syntax.
+func RenderDownloadTemplate(tmpl string, version string) (string, error) {
+	t, err := template.New("download").Parse(tmpl)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse download template %q: %w", tmpl, err)
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, TemplateData{Version: version}); err != nil {
+		return "", fmt.Errorf("failed to render download template %q: %w", tmpl, err)
+	}
+	return buf.String(), nil
 }

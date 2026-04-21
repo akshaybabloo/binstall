@@ -243,3 +243,102 @@ func FuzzExtractVersion(f *testing.F) {
 		}
 	})
 }
+
+func TestNormalizeArch(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"amd64", "amd64"},
+		{"x86_64", "amd64"},
+		{"arm64", "arm64"},
+		{"aarch64", "arm64"},
+		{"386", "386"},
+		{"i386", "386"},
+		{"i686", "386"},
+		{"AARCH64", "arm64"},
+		{"X86_64", "amd64"},
+		{"riscv64", "riscv64"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, NormalizeArch(tt.input))
+		})
+	}
+}
+
+func TestRenderDownloadTemplate(t *testing.T) {
+	tests := []struct {
+		name    string
+		tmpl    string
+		version string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "with version template",
+			tmpl:    "bat-{{.Version}}-x86_64-unknown-linux-gnu.tar.gz",
+			version: "v0.24.0",
+			want:    "bat-v0.24.0-x86_64-unknown-linux-gnu.tar.gz",
+		},
+		{
+			name:    "no template syntax",
+			tmpl:    "bat-v0.24.0-x86_64-unknown-linux-gnu.tar.gz",
+			version: "v0.24.0",
+			want:    "bat-v0.24.0-x86_64-unknown-linux-gnu.tar.gz",
+		},
+		{
+			name:    "empty version",
+			tmpl:    "bat-{{.Version}}-linux.tar.gz",
+			version: "",
+			want:    "bat--linux.tar.gz",
+		},
+		{
+			name:    "invalid template",
+			tmpl:    "bat-{{.Version}-linux.tar.gz",
+			version: "v1.0",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := RenderDownloadTemplate(tt.tmpl, tt.version)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseYamlWithDownload(t *testing.T) {
+	yamlContent := []byte(`
+name: "Bat"
+url: "https://github.com/sharkdp/bat"
+installLocation: "~/bin"
+download:
+  linux:
+    amd64:
+      fileName: "bat-{{.Version}}-x86_64-unknown-linux-gnu.tar.gz"
+    aarch64:
+      fileName: "bat-{{.Version}}-aarch64-unknown-linux-gnu.tar.gz"
+files:
+  - fileName: "bat"
+    copyIt: true
+    checkVersion: true
+    versionCommand:
+      args: "--version"
+      regexVersion: "\\d+\\.\\d+\\.\\d+"
+`)
+	b, err := ParseYaml(yamlContent)
+	require.NoError(t, err)
+	assert.Equal(t, "Bat", b.Name)
+	assert.NotNil(t, b.Download)
+	assert.Contains(t, b.Download, "linux")
+	assert.Contains(t, b.Download["linux"], "amd64")
+	assert.Equal(t, "bat-{{.Version}}-x86_64-unknown-linux-gnu.tar.gz", b.Download["linux"]["amd64"].FileName)
+	assert.Contains(t, b.Download["linux"], "aarch64")
+	assert.Equal(t, "bat-{{.Version}}-aarch64-unknown-linux-gnu.tar.gz", b.Download["linux"]["aarch64"].FileName)
+}
