@@ -11,7 +11,7 @@ import (
 
 	"github.com/akshaybabloo/binstall/pkg/fileio"
 
-	"github.com/MakeNowJust/heredoc"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
