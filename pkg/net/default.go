@@ -53,12 +53,12 @@ func resolveDownloadFileName(b models.Binaries, tagName string) string {
 	for archKey, info := range archMap {
 		if utils.NormalizeArch(archKey) == runtime.GOARCH {
 			if info.FileName == "" {
-				return ""
+				continue
 			}
 			rendered, err := utils.RenderDownloadTemplate(info.FileName, tagName)
 			if err != nil {
 				logrus.Warnf("Failed to render download template for %s: %v", b.Name, err)
-				return ""
+				continue
 			}
 			return rendered
 		}
@@ -130,8 +130,11 @@ func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error)
 					break
 				}
 			}
-		} else {
-			// Fall back to auto-detection from release asset filenames
+		}
+
+		// Fall back to auto-detection if no download URL was resolved
+		// (either no download config or configured filename not found in assets)
+		if b.DownloadURL == "" {
 			for _, asset := range releases.Assets {
 				osArch := utils.FigureOutOSAndArch(asset.GetName())
 				ext := filepath.Ext(asset.GetName())
