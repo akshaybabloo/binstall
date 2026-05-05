@@ -232,9 +232,9 @@ func FuzzExtractVersion(f *testing.F) {
 	f.Add("invalid regex", "[") // A known-bad regex pattern
 	f.Add("", "")               // Empty inputs
 
-	f.Fuzz(func(t *testing.T, regexPattern string, inputString string) {
+	f.Fuzz(func(t *testing.T, inputString string, regexPattern string) {
 		t.Parallel()
-		_, err := ExtractVersion(regexPattern, inputString)
+		_, err := ExtractVersion(inputString, regexPattern)
 		if err != nil {
 			var syntaxError *syntax.Error
 			if !errors.As(err, &syntaxError) {
@@ -308,6 +308,51 @@ func TestRenderDownloadTemplate(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestContains(t *testing.T) {
+	tests := []struct {
+		name string
+		s    []string
+		e    string
+		want bool
+	}{
+		{"in_slice", []string{"a", "b", "c"}, "b", true},
+		{"not_in_slice", []string{"a", "b", "c"}, "z", false},
+		{"empty_slice", nil, "a", false},
+		{"empty_string_in_slice_of_empty", []string{""}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, Contains(tt.s, tt.e))
+		})
+	}
+}
+
+func TestExtractVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		regex   string
+		want    string
+		wantErr bool
+	}{
+		{name: "simple_match", input: "1.2.3", regex: `\d+\.\d+\.\d+`, want: "1.2.3"},
+		{name: "two_token_format", input: "Something v1.0.0", regex: `Something v\d+\.\d+\.\d+`, want: "v1.0.0"},
+		{name: "no_match_returns_empty_no_error", input: "no version here", regex: `v\d+`, want: ""},
+		{name: "invalid_regex_returns_error", input: "anything", regex: "[", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractVersion(tt.input, tt.regex)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
