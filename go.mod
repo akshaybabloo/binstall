@@ -12,7 +12,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v85 v85.0.0
 	github.com/hashicorp/go-version v1.9.0
-	github.com/jedib0t/go-pretty/v6 v6.7.9
+	github.com/jedib0t/go-pretty/v6 v6.7.10
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stoewer/go-strcase v1.3.1
