@@ -37,6 +37,15 @@ const (
 var ignoreFileExt = []string{".deb", ".sig", ".rpm", ".pem", ".sbom"}
 var allowedMediaTypes = []string{"application/gzip", "application/zip", "application/x-bzip1-compressed-tar", "application/x-bzip-compressed-tar", "raw", "application/x-gtar", "application/octet-stream"}
 
+// newGitHubClient builds the github client used by checkForNewVersion.
+// Exposed as a var so tests can substitute a client pointing at httptest.
+var newGitHubClient = func(token string) *github.Client {
+	if token != "" {
+		return github.NewClient(nil).WithAuthToken(token)
+	}
+	return github.NewClient(nil)
+}
+
 // resolveDownloadFileName checks the Binaries.Download config for an explicit file name
 // matching the current OS/arch. Returns the rendered file name, or empty string if none configured.
 func resolveDownloadFileName(b models.Binaries, tagName string) string {
@@ -101,14 +110,13 @@ func findProvider(b models.Binaries) models.Binaries {
 func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error) {
 	if b.Provider == GitHub {
 		info := utils.ExpandGitHubURL(b.URL)
-		var c *github.Client
 
+		var token string
 		if len(a) > 0 && a[0] != "" {
-			b.Token = a[0]
-			c = github.NewClient(nil).WithAuthToken(b.Token)
-		} else {
-			c = github.NewClient(nil)
+			token = a[0]
+			b.Token = token
 		}
+		c := newGitHubClient(token)
 
 		releases, _, err := c.Repositories.GetLatestRelease(context.Background(), info.Owner, info.Repo)
 		if err != nil {
@@ -241,21 +249,29 @@ func verifyFile(b models.Binaries) (bool, error) {
 		if shaType == "" {
 			shaType = "sha256"
 		}
-		if shaType == "sha256" {
-			calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
-			if err != nil {
-				return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
-			}
-			expected := strings.ToLower(strings.TrimSpace(b.Sha.Checksum))
-			if strings.ToLower(calculated) != expected {
-				return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
-			}
-			return true, nil
+		if shaType != "sha256" {
+			return false, fmt.Errorf("unsupported sha type %q for %s", shaType, b.Name)
 		}
+		calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
+		if err != nil {
+			return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
+		}
+		expected := strings.ToLower(strings.TrimSpace(b.Sha.Checksum))
+		if strings.ToLower(calculated) != expected {
+			return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
+		}
+		return true, nil
 	}
 
 	// Then check URL-based checksum
 	if b.Sha.URL != "" {
+		if b.Sha.ShaType == "" {
+			return false, fmt.Errorf("no sha type provided for: %s", b.Name)
+		}
+		if b.Sha.ShaType != "sha256" {
+			return false, fmt.Errorf("unsupported sha type %q for %s", b.Sha.ShaType, b.Name)
+		}
+
 		client := resty.New()
 		r, err := client.R().Get(b.Sha.URL)
 		if err != nil {
@@ -264,27 +280,21 @@ func verifyFile(b models.Binaries) (bool, error) {
 
 		shaContent := string(r.Body())
 
-		if b.Sha.ShaType == "" {
-			return false, fmt.Errorf("no sha type provided for: %s", b.Name)
+		calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
+		if err != nil {
+			return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
 		}
 
-		if b.Sha.ShaType == "sha256" {
-			calculated, err := utils.CalculateSHA256(b.DownloadFilePath)
-			if err != nil {
-				return false, fmt.Errorf("failed to calculate sha256 for %s: %w", b.Name, err)
-			}
-
-			// Parse the SHA file to extract the checksum
-			expected := utils.ParseSHAFile(shaContent, b.DownloadFileName)
-			if expected == "" {
-				return false, fmt.Errorf("could not parse checksum from SHA file for %s", b.Name)
-			}
-
-			if strings.ToLower(calculated) != expected {
-				return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
-			}
-			return true, nil
+		// Parse the SHA file to extract the checksum
+		expected := utils.ParseSHAFile(shaContent, b.DownloadFileName)
+		if expected == "" {
+			return false, fmt.Errorf("could not parse checksum from SHA file for %s", b.Name)
 		}
+
+		if strings.ToLower(calculated) != expected {
+			return false, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", b.Name, expected, calculated)
+		}
+		return true, nil
 	}
 
 	// No checksum verification configured - pass
