@@ -973,6 +973,69 @@ func TestCheckUpdates(t *testing.T) {
 		assert.Equal(t, "Not Found", got.CurrentVersion)
 	})
 
+	t.Run("letter_suffix_release_is_post_release", func(t *testing.T) {
+		// Regression: tmux 3.6a is a post-release patch of 3.6, so an installed
+		// 3.6 must be detected as out-of-date relative to a 3.6a release.
+		// Without NormalizeLetterSuffix, hashicorp/go-version would treat 3.6a
+		// as a pre-release ("3.6.0-a") and rank it below plain 3.6.
+		bindir := t.TempDir()
+		writeShellScript(t, bindir, "tmux", `echo "tmux 3.6"`)
+		t.Setenv("PATH", bindir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+		assetName := currentOSArchAssetName("tar.gz")
+		withGitHubServer(t, "3.6a", []*github.ReleaseAsset{{
+			Name:               github.Ptr(assetName),
+			BrowserDownloadURL: github.Ptr("https://example.test/" + assetName),
+			ContentType:        github.Ptr("application/gzip"),
+		}})
+
+		b := models.Binaries{
+			URL: "https://github.com/tmux/tmux",
+			Files: []models.File{{
+				FileName:     "tmux",
+				CheckVersion: true,
+				VersionCommand: models.VersionCommand{
+					Args:         "-V",
+					RegexVersion: `\d+(?:\.\d+)+[a-z]?`,
+				},
+			}},
+		}
+		got, err := CheckUpdates(b)
+		require.NoError(t, err)
+		assert.True(t, got.UpdatesAvailable, "3.6a should be detected as newer than 3.6")
+		assert.Equal(t, "3.6", got.CurrentVersion)
+		assert.Equal(t, "3.6a", got.NewVersion)
+	})
+
+	t.Run("letter_suffix_already_installed", func(t *testing.T) {
+		// Same letter on both sides should report no update.
+		bindir := t.TempDir()
+		writeShellScript(t, bindir, "tmux", `echo "tmux 3.6a"`)
+		t.Setenv("PATH", bindir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+		assetName := currentOSArchAssetName("tar.gz")
+		withGitHubServer(t, "3.6a", []*github.ReleaseAsset{{
+			Name:               github.Ptr(assetName),
+			BrowserDownloadURL: github.Ptr("https://example.test/" + assetName),
+			ContentType:        github.Ptr("application/gzip"),
+		}})
+
+		b := models.Binaries{
+			URL: "https://github.com/tmux/tmux",
+			Files: []models.File{{
+				FileName:     "tmux",
+				CheckVersion: true,
+				VersionCommand: models.VersionCommand{
+					Args:         "-V",
+					RegexVersion: `\d+(?:\.\d+)+[a-z]?`,
+				},
+			}},
+		}
+		got, err := CheckUpdates(b)
+		require.NoError(t, err)
+		assert.False(t, got.UpdatesAvailable)
+	})
+
 	t.Run("binary_not_installed_no_matching_asset_returns_empty", func(t *testing.T) {
 		t.Setenv("PATH", t.TempDir())
 

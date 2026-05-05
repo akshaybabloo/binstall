@@ -172,6 +172,34 @@ func ExtractVersion(version, regex string) (string, error) {
 	return "", nil
 }
 
+// letterSuffixRe matches a numeric version with a single trailing lowercase
+// letter (e.g. "3.6a", "v1.1.1k"). Group 1 is the numeric part (with optional
+// "v"), group 2 is the suffix letter.
+var letterSuffixRe = regexp.MustCompile(`^(v?\d+(?:\.\d+)+)([a-z])$`)
+
+// NormalizeLetterSuffix converts a version string with a single trailing
+// lowercase letter into a numeric form with the letter position appended as
+// an extra patch segment, e.g. "3.6a" -> "3.6.1", "1.1.1k" -> "1.1.1.11".
+//
+// This makes letter-suffix patch releases (used by tmux, OpenSSL, and other
+// projects) order correctly under standard semver comparison: 3.6 < 3.6a <
+// 3.6b < 3.7. Without this conversion, hashicorp/go-version interprets the
+// letter as a semver pre-release and orders 3.6a < 3.6, which is the
+// opposite of these projects' conventions.
+//
+// Inputs without a trailing letter, with multiple trailing letters, or with
+// a hyphen-separated semver pre-release (e.g. "1.0.0-beta1") are returned
+// unchanged.
+func NormalizeLetterSuffix(v string) string {
+	trimmed := strings.TrimSpace(v)
+	m := letterSuffixRe.FindStringSubmatch(trimmed)
+	if m == nil {
+		return v
+	}
+	pos := int(m[2][0]-'a') + 1
+	return fmt.Sprintf("%s.%d", m[1], pos)
+}
+
 // NormalizeArch normalizes architecture names to Go's runtime.GOARCH values
 func NormalizeArch(arch string) string {
 	switch strings.ToLower(arch) {

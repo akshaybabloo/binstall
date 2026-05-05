@@ -206,12 +206,14 @@ func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
 		checkV.CurrentVersion = "0.0.0"
 	}
 
-	currentVersion, err := version.NewVersion(checkV.CurrentVersion)
+	// Normalize letter-suffix releases (e.g. tmux 3.6a -> 3.6.1) so semver
+	// comparison orders them as post-release patches, not pre-releases.
+	currentVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(checkV.CurrentVersion))
 	if err != nil {
 		return models.Binaries{}, fmt.Errorf("error parsing the current version for: %s - %w ", b.Name, err)
 	}
 
-	newVersion, err := version.NewVersion(checkV.NewVersion)
+	newVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(checkV.NewVersion))
 	if err != nil {
 		return models.Binaries{}, fmt.Errorf("error parsing the new version for: %s - %w ", b.Name, err)
 	}
@@ -480,12 +482,12 @@ func verifyNewBin(b models.Binaries) error {
 			return fmt.Errorf("failed to compile regex for %s: %w", file.FileName, err)
 		}
 
-		installedVersion, err := version.NewVersion(strings.TrimSpace(match))
+		installedVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(match)))
 		if err != nil {
 			return fmt.Errorf("failed to parse installed version for %s: %w", file.FileName, err)
 		}
 
-		newVersion, err := version.NewVersion(strings.TrimSpace(b.NewVersion))
+		newVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(b.NewVersion)))
 		if err != nil {
 			return fmt.Errorf("failed to parse new version for %s: %w", file.FileName, err)
 		}
