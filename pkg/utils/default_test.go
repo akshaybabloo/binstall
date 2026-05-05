@@ -244,6 +244,39 @@ func FuzzExtractVersion(f *testing.F) {
 	})
 }
 
+func TestNormalizeLetterSuffix(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"3.6", "3.6"},
+		{"3.6a", "3.6.1"},
+		{"3.6b", "3.6.2"},
+		{"3.6z", "3.6.26"},
+		{"v3.6a", "v3.6.1"},
+		{"3.6.4", "3.6.4"},
+		{"3.6.4a", "3.6.4.1"},
+		{"1.1.1k", "1.1.1.11"},
+		{"  3.6a  ", "3.6.1"},
+		// Leave alone: hyphen-separated semver pre-release.
+		{"1.0.0-beta1", "1.0.0-beta1"},
+		// Leave alone: multi-letter suffixes are ambiguous.
+		{"3.6aa", "3.6aa"},
+		// Leave alone: not a numeric version at all.
+		{"abc", "abc"},
+		{"", ""},
+		// Leave alone: single number isn't <X.Y> shape.
+		{"3a", "3a"},
+		// Leave alone: uppercase suffix (uncommon, easy to extend later).
+		{"3.6A", "3.6A"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, NormalizeLetterSuffix(tt.input))
+		})
+	}
+}
+
 func TestNormalizeArch(t *testing.T) {
 	tests := []struct {
 		input string
