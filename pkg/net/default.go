@@ -39,11 +39,11 @@ var allowedMediaTypes = []string{"application/gzip", "application/zip", "applica
 
 // newGitHubClient builds the github client used by checkForNewVersion.
 // Exposed as a var so tests can substitute a client pointing at httptest.
-var newGitHubClient = func(token string) *github.Client {
+var newGitHubClient = func(token string) (*github.Client, error) {
 	if token != "" {
-		return github.NewClient(nil).WithAuthToken(token)
+		return github.NewClient(github.WithAuthToken(token))
 	}
-	return github.NewClient(nil)
+	return github.NewClient()
 }
 
 // resolveDownloadFileName checks the Binaries.Download config for an explicit file name
@@ -116,7 +116,10 @@ func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error)
 			token = a[0]
 			b.Token = token
 		}
-		c := newGitHubClient(token)
+		c, err := newGitHubClient(token)
+		if err != nil {
+			return models.Binaries{}, err
+		}
 
 		releases, _, err := c.Repositories.GetLatestRelease(context.Background(), info.Owner, info.Repo)
 		if err != nil {

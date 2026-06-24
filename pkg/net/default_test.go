@@ -544,10 +544,8 @@ func withGitHubServer(t *testing.T, tagName string, assets []*github.ReleaseAsse
 	t.Cleanup(srv.Close)
 
 	old := newGitHubClient
-	newGitHubClient = func(token string) *github.Client {
-		c, err := github.NewClient(nil).WithEnterpriseURLs(srv.URL+"/", srv.URL+"/")
-		require.NoError(t, err)
-		return c
+	newGitHubClient = func(token string) (*github.Client, error) {
+		return github.NewClient(github.WithEnterpriseURLs(srv.URL+"/", srv.URL+"/"))
 	}
 	t.Cleanup(func() { newGitHubClient = old })
 	return srv
