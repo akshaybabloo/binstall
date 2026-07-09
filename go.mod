@@ -13,7 +13,7 @@ require (
 	github.com/google/go-github/v88 v88.0.0
 	github.com/google/go-github/v89 v89.0.0
 	github.com/hashicorp/go-version v1.9.0
-	github.com/jedib0t/go-pretty/v6 v6.8.1
+	github.com/jedib0t/go-pretty/v6 v6.8.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stoewer/go-strcase v1.3.1
