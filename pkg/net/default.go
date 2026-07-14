@@ -82,7 +82,7 @@ func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 		file := &b.Files[i]
 		if file.CheckVersion {
 			cmd := exec.Command(file.FileName, file.VersionCommand.Args)
-			stdout, err := cmd.Output()
+			stdout, err := cmd.CombinedOutput()
 			if err != nil {
 				if errors.Is(err, exec.ErrNotFound) {
 					return models.Binaries{}, exec.ErrNotFound
