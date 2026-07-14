@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -594,7 +594,7 @@ func uniqueTempName(t *testing.T) string {
 func withGitHubServer(t *testing.T, tagName string, assets []*github.ReleaseAsset) *httptest.Server {
 	t.Helper()
 	rel := &github.RepositoryRelease{
-		TagName: github.Ptr(tagName),
+		TagName: tagName,
 		Assets:  assets,
 	}
 	body, err := json.Marshal(rel)

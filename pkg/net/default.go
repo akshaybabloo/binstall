@@ -18,7 +18,7 @@ import (
 	"github.com/akshaybabloo/binstall/pkg"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/hashicorp/go-version"
 	"golift.io/xtractr"
 

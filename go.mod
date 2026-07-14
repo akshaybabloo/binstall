@@ -11,7 +11,6 @@ require (
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v89 v89.0.0
-	github.com/google/go-github/v89 v89.0.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
 	github.com/sirupsen/logrus v1.9.4
