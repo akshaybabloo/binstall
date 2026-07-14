@@ -21,8 +21,12 @@ func NewRootCmd(appVersion, buildDate string) *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "binstall [OPTIONS] [COMMANDS]",
 		Short: "binstall is a tool to download and install binaries",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if verbose {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			isVerbose, err := cmd.Flags().GetBool("verbose")
+			if err != nil {
+				return err
+			}
+			if isVerbose {
 				level, err := logrus.ParseLevel("debug")
 				if err != nil {
 					return err

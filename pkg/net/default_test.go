@@ -419,6 +419,30 @@ func TestMoveFiles(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("discover_source_in_extracted_subdirectory", func(t *testing.T) {
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "llama-b9993"), 0o755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(downloadDir, "llama-b9993", "llama-cli"),
+			[]byte("data"), 0o755,
+		))
+
+		// The extracted root folder does not match FileNameWithoutExtension.
+		b := models.Binaries{
+			Name:             "test",
+			DownloadFolder:   downloadDir,
+			DownloadFileName: "llama-b9993-bin-ubuntu-vulkan-arm64.tar.gz",
+			InstallLocation:  installDir,
+			Files:            []models.File{{FileName: "llama-cli", CopyIt: true}},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		_, err := os.Stat(filepath.Join(installDir, "llama-cli"))
+		assert.NoError(t, err)
+	})
+
 	t.Run("tilde_expansion", func(t *testing.T) {
 		fakeHome := t.TempDir()
 		t.Setenv("HOME", fakeHome)
@@ -529,6 +553,103 @@ func TestMoveFiles(t *testing.T) {
 		require.NoError(t, err)
 		_, err = os.Stat(srcCLI)
 		assert.True(t, os.IsNotExist(err), "explicit move should still move the source after wildcard copy")
+	})
+
+	t.Run("wildcard_preserves_symlinks", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("symlinks require elevated privileges on Windows")
+		}
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		// Simulate a versioned .so with symlink chain: libfoo.so -> libfoo.so.0 -> libfoo.so.1.2.3
+		realFile := filepath.Join(downloadDir, "libfoo.so.1.2.3")
+		require.NoError(t, os.WriteFile(realFile, []byte("lib content"), 0o755))
+		require.NoError(t, os.Symlink("libfoo.so.1.2.3", filepath.Join(downloadDir, "libfoo.so.0")))
+		require.NoError(t, os.Symlink("libfoo.so.0", filepath.Join(downloadDir, "libfoo.so")))
+
+		b := models.Binaries{
+			Name:            "test",
+			DownloadFolder:  downloadDir,
+			InstallLocation: installDir,
+			Files:           []models.File{{FileName: "*", CopyIt: true}},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		// Real file must exist
+		_, err := os.Lstat(filepath.Join(installDir, "libfoo.so.1.2.3"))
+		require.NoError(t, err)
+
+		// libfoo.so.0 must be a symlink pointing to libfoo.so.1.2.3
+		so0Info, err := os.Lstat(filepath.Join(installDir, "libfoo.so.0"))
+		require.NoError(t, err)
+		assert.NotZero(t, so0Info.Mode()&os.ModeSymlink, "libfoo.so.0 should be a symlink")
+		target, err := os.Readlink(filepath.Join(installDir, "libfoo.so.0"))
+		require.NoError(t, err)
+		assert.Equal(t, "libfoo.so.1.2.3", target)
+
+		// libfoo.so must be a symlink pointing to libfoo.so.0
+		soInfo, err := os.Lstat(filepath.Join(installDir, "libfoo.so"))
+		require.NoError(t, err)
+		assert.NotZero(t, soInfo.Mode()&os.ModeSymlink, "libfoo.so should be a symlink")
+		target, err = os.Readlink(filepath.Join(installDir, "libfoo.so"))
+		require.NoError(t, err)
+		assert.Equal(t, "libfoo.so.0", target)
+	})
+
+	t.Run("wildcard_copy_contents_from_template", func(t *testing.T) {
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "binstall-v1.2.3", "bin"), 0o755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(downloadDir, "binstall-v1.2.3", "bin", "tool"),
+			[]byte("data"), 0o755,
+		))
+
+		b := models.Binaries{
+			Name:            "test",
+			DownloadFolder:  downloadDir,
+			InstallLocation: installDir,
+			NewVersion:      "v1.2.3",
+			Files: []models.File{{
+				FileName:         "*",
+				CopyIt:           true,
+				CopyContentsFrom: "binstall-{{.Version}}",
+			}},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		_, err := os.Stat(filepath.Join(installDir, "bin", "tool"))
+		require.NoError(t, err)
+	})
+
+	t.Run("single_file_copy_contents_from_template", func(t *testing.T) {
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "binstall-v1.2.3", "bin"), 0o755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(downloadDir, "binstall-v1.2.3", "bin", "tool"),
+			[]byte("data"), 0o755,
+		))
+
+		b := models.Binaries{
+			Name:            "test",
+			DownloadFolder:  downloadDir,
+			InstallLocation: installDir,
+			NewVersion:      "v1.2.3",
+			Files: []models.File{{
+				FileName:         "tool",
+				SourcePath:       "bin/tool",
+				CopyIt:           true,
+				CopyContentsFrom: "binstall-{{.Version}}",
+			}},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		_, err := os.Stat(filepath.Join(installDir, "tool"))
+		require.NoError(t, err)
 	})
 }
 
@@ -833,9 +954,9 @@ func TestUncompressFile(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to detect the file type")
 	})
 
-	t.Run("disallowed_media_type", func(t *testing.T) {
-		// Build a real gzip archive (so mimetype detection passes), but report
-		// a content type that isn't in allowedMediaTypes.
+	t.Run("disallowed_content_type_falls_back_to_detected_type", func(t *testing.T) {
+		// Build a real gzip archive and report a bogus content type. We should
+		// still extract successfully based on detected file type.
 		dir := t.TempDir()
 		archive := filepath.Join(dir, "release.tar.gz")
 		makeTarGz(t, archive, map[string]string{"tool": "data"})
@@ -847,12 +968,13 @@ func TestUncompressFile(t *testing.T) {
 			DownloadFileName: "release.tar.gz",
 			ContentType:      "application/x-totally-made-up",
 		}
-		err := uncompressFile(b)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "file type not supported")
+		require.NoError(t, uncompressFile(b))
+
+		_, err := os.Stat(filepath.Join(dir, "tool"))
+		assert.NoError(t, err)
 	})
 
-	t.Run("unparseable_content_type", func(t *testing.T) {
+	t.Run("unparseable_content_type_falls_back_to_detected_type", func(t *testing.T) {
 		dir := t.TempDir()
 		archive := filepath.Join(dir, "release.tar.gz")
 		makeTarGz(t, archive, map[string]string{"tool": "data"})
@@ -864,7 +986,27 @@ func TestUncompressFile(t *testing.T) {
 			DownloadFileName: "release.tar.gz",
 			ContentType:      "not a media type",
 		}
-		require.Error(t, uncompressFile(b))
+		require.NoError(t, uncompressFile(b))
+
+		_, err := os.Stat(filepath.Join(dir, "tool"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("unsupported_detected_file_type_still_fails", func(t *testing.T) {
+		dir := t.TempDir()
+		plain := filepath.Join(dir, "release.txt")
+		require.NoError(t, os.WriteFile(plain, []byte("not an archive"), 0o644))
+
+		b := models.Binaries{
+			Name:             "test",
+			DownloadFolder:   dir,
+			DownloadFilePath: plain,
+			DownloadFileName: "release.txt",
+			ContentType:      "application/json",
+		}
+		err := uncompressFile(b)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file type not supported")
 	})
 }
 
