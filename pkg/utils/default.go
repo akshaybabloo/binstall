@@ -177,6 +177,10 @@ func ExtractVersion(version, regex string) (string, error) {
 // "v"), group 2 is the suffix letter.
 var letterSuffixRe = regexp.MustCompile(`^(v?\d+(?:\.\d+)+)([a-z])$`)
 
+// bPrefixBuildRe matches tags like "b9993" used by some projects (e.g. llama.cpp).
+// Group 1 is the numeric build number.
+var bPrefixBuildRe = regexp.MustCompile(`^[bB](\d+)$`)
+
 // NormalizeLetterSuffix converts a version string with a single trailing
 // lowercase letter into a numeric form with the letter position appended as
 // an extra patch segment, e.g. "3.6a" -> "3.6.1", "1.1.1k" -> "1.1.1.11".
@@ -192,6 +196,9 @@ var letterSuffixRe = regexp.MustCompile(`^(v?\d+(?:\.\d+)+)([a-z])$`)
 // unchanged.
 func NormalizeLetterSuffix(v string) string {
 	trimmed := strings.TrimSpace(v)
+	if m := bPrefixBuildRe.FindStringSubmatch(trimmed); m != nil {
+		return m[1]
+	}
 	m := letterSuffixRe.FindStringSubmatch(trimmed)
 	if m == nil {
 		return v
