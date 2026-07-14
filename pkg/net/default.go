@@ -322,13 +322,28 @@ func uncompressFile(b models.Binaries) error {
 		return nil
 	}
 
-	mediaType, _, err := mime.ParseMediaType(b.ContentType)
-	if err != nil {
-		return err
+	detectedType := mtype.String()
+	headerAllowed := false
+
+	// Some providers may return incorrect content types (for example, application/json)
+	// even when the payload is a valid archive. Prefer validated header when present,
+	// but fall back to detected file type.
+	if b.ContentType != "" {
+		mediaType, _, err := mime.ParseMediaType(b.ContentType)
+		if err == nil {
+			if utils.Contains(allowedMediaTypes, mediaType) {
+				headerAllowed = true
+			}
+			if !headerAllowed {
+				logrus.Debugf("Unsupported Content-Type %s for %s; falling back to detected type %s", mediaType, b.Name, detectedType)
+			}
+		} else {
+			logrus.Debugf("Failed to parse Content-Type %q for %s; falling back to detected type %s: %v", b.ContentType, b.Name, detectedType, err)
+		}
 	}
-	// Check if the file is a gzip or zip file, if not return nil
-	if !utils.Contains(allowedMediaTypes, mediaType) {
-		return fmt.Errorf("file type not supported: %s. Allowed types: %v", mediaType, allowedMediaTypes)
+
+	if !headerAllowed && !utils.Contains(allowedMediaTypes, detectedType) {
+		return fmt.Errorf("file type not supported: %s. Allowed types: %v", detectedType, allowedMediaTypes)
 	}
 
 	x := &xtractr.XFile{
