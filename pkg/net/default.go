@@ -388,6 +388,7 @@ func moveFiles(b *models.Binaries) error {
 		if file.SourcePath != "" {
 			srcPath = filepath.Join(b.DownloadFolder, file.SourcePath)
 		}
+		srcPath = resolveSingleFileSourcePath(*b, file, srcPath)
 		dstPath := filepath.Join(b.InstallLocation, file.FileName)
 		if file.RenameTo != "" {
 			dstPath = filepath.Join(b.InstallLocation, file.RenameTo)
@@ -424,14 +425,7 @@ func moveFiles(b *models.Binaries) error {
 			err = os.Rename(srcPath, dstPath)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					// Try to adjust the path - archives often extract to a versioned subdirectory
-					f := utils.FileNameWithoutExtension(b.DownloadFileName)
-					// Use sourcePath if available, otherwise just the fileName
-					relativePath := file.FileName
-					if file.SourcePath != "" {
-						relativePath = file.SourcePath
-					}
-					srcPath = filepath.Join(b.DownloadFolder, f, relativePath)
+					srcPath = resolveSingleFileSourcePath(*b, file, srcPath)
 					err = os.Rename(srcPath, dstPath)
 					if err != nil {
 						return fmt.Errorf("file not found even after path adjustment: %s to %s: %w", srcPath, dstPath, err)
@@ -472,7 +466,98 @@ func moveFiles(b *models.Binaries) error {
 	return nil
 }
 
+func resolveSingleFileSourcePath(b models.Binaries, file models.File, srcPath string) string {
+	if _, err := os.Stat(srcPath); err == nil {
+		return srcPath
+	}
+
+	relativePath := file.FileName
+	if file.SourcePath != "" {
+		relativePath = file.SourcePath
+	}
+
+	if configuredRoot := resolveConfiguredCopyRoot(b, file); configuredRoot != "" {
+		candidate := filepath.Join(configuredRoot, relativePath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	if b.DownloadFileName != "" {
+		f := utils.FileNameWithoutExtension(b.DownloadFileName)
+		candidate := filepath.Join(b.DownloadFolder, f, relativePath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	if discovered := discoverExtractedSourcePath(b, relativePath, file.SourcePath != ""); discovered != "" {
+		return discovered
+	}
+
+	return srcPath
+}
+
+func resolveConfiguredCopyRoot(b models.Binaries, file models.File) string {
+	if file.CopyContentsFrom == "" {
+		return ""
+	}
+
+	root := file.CopyContentsFrom
+	if strings.Contains(root, "{{") {
+		rendered, err := utils.RenderDownloadTemplate(root, b.NewVersion)
+		if err != nil {
+			logrus.Warnf("Failed to render copyContentsFrom template for %s: %v", b.Name, err)
+			return ""
+		}
+		root = rendered
+	}
+
+	return filepath.Join(b.DownloadFolder, root)
+}
+
+func discoverExtractedSourcePath(b models.Binaries, relativePath string, strictRelativeMatch bool) string {
+	var match string
+	_ = filepath.WalkDir(b.DownloadFolder, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(b.DownloadFolder, path)
+		if relErr != nil {
+			return nil
+		}
+
+		if b.DownloadFileName != "" && rel == b.DownloadFileName {
+			return nil
+		}
+
+		if rel == relativePath || strings.HasSuffix(rel, string(os.PathSeparator)+relativePath) {
+			match = path
+			return filepath.SkipDir
+		}
+
+		if !strictRelativeMatch && filepath.Base(rel) == filepath.Base(relativePath) {
+			match = path
+			return filepath.SkipDir
+		}
+
+		return nil
+	})
+
+	return match
+}
+
 func resolveWildcardSourceRoot(b models.Binaries, file models.File) string {
+	if configuredRoot := resolveConfiguredCopyRoot(b, file); configuredRoot != "" {
+		if info, err := os.Stat(configuredRoot); err == nil && info.IsDir() {
+			return configuredRoot
+		}
+	}
+
 	if file.SourcePath != "" {
 		return filepath.Join(b.DownloadFolder, file.SourcePath)
 	}
@@ -521,6 +606,13 @@ func copyAllRecursively(b models.Binaries, file models.File) error {
 	err := filepath.Walk(sourceRoot, func(srcPath string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
+		}
+
+		// Re-stat with Lstat to guarantee ModeSymlink is set for symlinks.
+		// filepath.Walk's info comes from DirEntry.Info() which can omit ModeSymlink
+		// on some filesystems/Go versions.
+		if lstatInfo, err := os.Lstat(srcPath); err == nil {
+			info = lstatInfo
 		}
 
 		relPath, err := filepath.Rel(sourceRoot, srcPath)

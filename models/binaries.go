@@ -10,6 +10,7 @@ type VersionCommand struct {
 type File struct {
 	CheckVersion       bool           `yaml:"checkVersion,omitempty" json:"checkVersion"`
 	FileName           string         `yaml:"fileName,omitempty" json:"fileName"`
+	CopyContentsFrom   string         `yaml:"copyContentsFrom,omitempty" json:"copyContentsFrom,omitempty"`
 	SourcePath         string         `yaml:"sourcePath,omitempty" json:"sourcePath,omitempty"` // Path inside archive (if different from fileName)
 	Exists             bool           `yaml:"exists,omitempty" json:"exists,omitempty"`
 	CopyIt             bool           `yaml:"copyIt" json:"copyIt"`                         // Copy the binary to the install location

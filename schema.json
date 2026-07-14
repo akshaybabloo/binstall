@@ -98,6 +98,9 @@
         "fileName": {
           "type": "string"
         },
+        "copyContentsFrom": {
+          "type": "string"
+        },
         "sourcePath": {
           "type": "string"
         },
