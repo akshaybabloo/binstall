@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"os"
 	"os/exec"
@@ -361,6 +362,13 @@ func moveFiles(b *models.Binaries) error {
 	}
 
 	for _, file := range b.Files {
+		if file.CopyIt && file.FileName == "*" {
+			if err := copyAllRecursively(*b, file); err != nil {
+				return err
+			}
+			continue
+		}
+
 		srcPath := filepath.Join(b.DownloadFolder, file.FileName)
 		if file.SourcePath != "" {
 			srcPath = filepath.Join(b.DownloadFolder, file.SourcePath)
@@ -444,6 +452,109 @@ func moveFiles(b *models.Binaries) error {
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+func resolveWildcardSourceRoot(b models.Binaries, file models.File) string {
+	if file.SourcePath != "" {
+		return filepath.Join(b.DownloadFolder, file.SourcePath)
+	}
+
+	if b.DownloadFileName != "" {
+		f := utils.FileNameWithoutExtension(b.DownloadFileName)
+		versionedDir := filepath.Join(b.DownloadFolder, f)
+		if info, err := os.Stat(versionedDir); err == nil && info.IsDir() {
+			return versionedDir
+		}
+	}
+
+	return b.DownloadFolder
+}
+
+func copyFileWithMode(srcPath, dstPath string, mode os.FileMode) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source file %s: %w", srcPath, err)
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
+	if err != nil {
+		return fmt.Errorf("failed to create destination file %s: %w", dstPath, err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("failed to copy %s to %s: %w", srcPath, dstPath, err)
+	}
+
+	if err := os.Chmod(dstPath, mode.Perm()); err != nil {
+		return fmt.Errorf("failed to set mode on %s: %w", dstPath, err)
+	}
+
+	return nil
+}
+
+func copyAllRecursively(b models.Binaries, file models.File) error {
+	sourceRoot := resolveWildcardSourceRoot(b, file)
+	if info, err := os.Stat(sourceRoot); err != nil || !info.IsDir() {
+		return fmt.Errorf("wildcard source root does not exist or is not a directory: %s", sourceRoot)
+	}
+
+	err := filepath.Walk(sourceRoot, func(srcPath string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		relPath, err := filepath.Rel(sourceRoot, srcPath)
+		if err != nil {
+			return err
+		}
+		if relPath == "." {
+			return nil
+		}
+
+		if b.DownloadFileName != "" && sourceRoot == b.DownloadFolder && relPath == b.DownloadFileName {
+			return nil
+		}
+
+		dstPath := filepath.Join(b.InstallLocation, relPath)
+
+		if info.IsDir() {
+			if err := os.MkdirAll(dstPath, info.Mode().Perm()); err != nil {
+				return fmt.Errorf("failed to create destination directory %s: %w", dstPath, err)
+			}
+			return nil
+		}
+
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return fmt.Errorf("failed to create destination parent directory for %s: %w", dstPath, err)
+		}
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(srcPath)
+			if err != nil {
+				return fmt.Errorf("failed to read symlink %s: %w", srcPath, err)
+			}
+			if err := os.RemoveAll(dstPath); err != nil {
+				return fmt.Errorf("failed to remove destination path %s before symlink copy: %w", dstPath, err)
+			}
+			if err := os.Symlink(target, dstPath); err != nil {
+				return fmt.Errorf("failed to create symlink %s -> %s: %w", dstPath, target, err)
+			}
+			return nil
+		}
+
+		if err := copyFileWithMode(srcPath, dstPath, info.Mode()); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to recursively copy files for wildcard entry: %w", err)
 	}
 
 	return nil

@@ -81,6 +81,17 @@ func TestResolveDownloadFileName(t *testing.T) {
 		assert.Equal(t, "tool-v1.2.3.tar.gz", resolveDownloadFileName(b, "v1.2.3"))
 	})
 
+	t.Run("template_render_supports_download_os_arch_filename_shape", func(t *testing.T) {
+		b := models.Binaries{
+			Download: map[string]map[string]models.DownloadArchInfo{
+				runtime.GOOS: {
+					archKeyForCurrent(t): {FileName: "llama-{{.Version}}-bin-ubuntu-vulkan-arm64.tar.gz"},
+				},
+			},
+		}
+		assert.Equal(t, "llama-v0.0.1-bin-ubuntu-vulkan-arm64.tar.gz", resolveDownloadFileName(b, "v0.0.1"))
+	})
+
 	t.Run("template_render_failure_returns_empty", func(t *testing.T) {
 		b := models.Binaries{
 			Download: map[string]map[string]models.DownloadArchInfo{
@@ -462,6 +473,62 @@ func TestMoveFiles(t *testing.T) {
 
 		_, err := os.Stat(filepath.Join(installDir, "tool"))
 		assert.True(t, os.IsNotExist(err), "file should not be copied when CopyIt is false")
+	})
+
+	t.Run("wildcard_copies_recursively", func(t *testing.T) {
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "bin"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "docs", "nested"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(downloadDir, "bin", "llama-cli"), []byte("#!/bin/sh\necho hi\n"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(downloadDir, "docs", "readme.txt"), []byte("readme"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(downloadDir, "docs", "nested", "notes.txt"), []byte("notes"), 0o644))
+
+		b := models.Binaries{
+			Name:             "test",
+			DownloadFolder:   downloadDir,
+			DownloadFileName: "tool-1.0.0.tar.gz",
+			InstallLocation:  installDir,
+			Files:            []models.File{{FileName: "*", CopyIt: true}},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		_, err := os.Stat(filepath.Join(installDir, "bin", "llama-cli"))
+		require.NoError(t, err)
+		_, err = os.Stat(filepath.Join(installDir, "docs", "readme.txt"))
+		require.NoError(t, err)
+		_, err = os.Stat(filepath.Join(installDir, "docs", "nested", "notes.txt"))
+		require.NoError(t, err)
+		_, err = os.Stat(filepath.Join(installDir, "tool-1.0.0.tar.gz"))
+		assert.True(t, os.IsNotExist(err), "download archive should not be copied by wildcard")
+	})
+
+	t.Run("wildcard_copy_keeps_source_for_explicit_entry", func(t *testing.T) {
+		downloadDir := t.TempDir()
+		installDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(filepath.Join(downloadDir, "bin"), 0o755))
+		srcCLI := filepath.Join(downloadDir, "bin", "llama-cli")
+		require.NoError(t, os.WriteFile(srcCLI, []byte("#!/bin/sh\necho hi\n"), 0o755))
+
+		b := models.Binaries{
+			Name:            "test",
+			DownloadFolder:  downloadDir,
+			InstallLocation: installDir,
+			Files: []models.File{
+				{FileName: "*", CopyIt: true},
+				{FileName: "llama-cli", SourcePath: "bin/llama-cli", CopyIt: true},
+			},
+		}
+		require.NoError(t, moveFiles(&b))
+
+		_, err := os.Stat(filepath.Join(installDir, "bin", "llama-cli"))
+		require.NoError(t, err)
+		_, err = os.Stat(filepath.Join(installDir, "llama-cli"))
+		require.NoError(t, err)
+		_, err = os.Stat(srcCLI)
+		assert.True(t, os.IsNotExist(err), "explicit move should still move the source after wildcard copy")
 	})
 }
 
