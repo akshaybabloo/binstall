@@ -269,6 +269,9 @@ func TestNormalizeLetterSuffix(t *testing.T) {
 		{"3a", "3a"},
 		// Leave alone: uppercase suffix (uncommon, easy to extend later).
 		{"3.6A", "3.6A"},
+		// b-prefixed numeric build tags used by some projects.
+		{"b9993", "9993"},
+		{"B123", "123"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
