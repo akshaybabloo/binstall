@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stoewer/go-strcase v1.3.1
 	github.com/stretchr/testify v1.11.1
-	golift.io/xtractr v0.4.1-0.20260714213811-4ceabfc1f420
+	golift.io/xtractr v0.4.1-0.20260715041605-5e7856d96b89
 )
 
 require (
