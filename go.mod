@@ -7,7 +7,7 @@ require (
 	github.com/akshaybabloo/jsonschema v0.0.0-20260421023746-90eeaf9de48d
 	github.com/briandowns/spinner v1.23.2
 	github.com/fatih/color v1.19.0
-	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v89 v89.0.0
