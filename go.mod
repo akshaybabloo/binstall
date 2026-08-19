@@ -14,10 +14,10 @@ require (
 	github.com/google/go-github/v90 v90.0.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
-	github.com/sirupsen/logrus v1.10.0
+	github.com/sirupsen/logrus v1.10.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stoewer/go-strcase v1.3.1
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	golift.io/xtractr v0.4.1-0.20260714213811-4ceabfc1f420
 )
 
