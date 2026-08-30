@@ -111,9 +111,9 @@ func TestParseYaml(t *testing.T) {
 		args args
 		want models.Binaries
 	}{
-		{name: "empty", args: args{s: []byte{}}, want: models.Binaries{}},
+		{name: "empty", args: args{s: []byte{}}, want: models.Binaries{Settings: &models.Settings{Active: true}}},
 		{name: "invalid", args: args{s: []byte("invalid")}, want: models.Binaries{}},
-		{name: "valid", args: args{s: []byte("name: test")}, want: models.Binaries{Name: "test"}},
+		{name: "valid", args: args{s: []byte("name: test")}, want: models.Binaries{Name: "test", Settings: &models.Settings{Active: true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

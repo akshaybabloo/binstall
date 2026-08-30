@@ -6,6 +6,32 @@ type VersionCommand struct {
 	RegexVersion string `yaml:"regexVersion,omitempty" json:"regexVersion,omitempty"`
 }
 
+// Settings holds the per-binary activation state read from the config's "settings" block.
+type Settings struct {
+	Active            bool `yaml:"active,omitempty" json:"active,omitempty"`
+	DeleteIfNotActive bool `yaml:"deleteIfNotActive,omitempty" json:"deleteIfNotActive,omitempty"`
+}
+
+// UnmarshalYAML defaults Active to true when the settings block omits it, so a
+// config stays enabled unless active is explicitly set to false.
+func (s *Settings) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawSettings struct {
+		Active            *bool `yaml:"active,omitempty"`
+		DeleteIfNotActive bool  `yaml:"deleteIfNotActive,omitempty"`
+	}
+	var raw rawSettings
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	if raw.Active == nil {
+		s.Active = true
+	} else {
+		s.Active = *raw.Active
+	}
+	s.DeleteIfNotActive = raw.DeleteIfNotActive
+	return nil
+}
+
 // File holds the information about the binary files
 type File struct {
 	CheckVersion       bool           `yaml:"checkVersion,omitempty" json:"checkVersion"`
@@ -74,4 +100,6 @@ type Binaries struct {
 	Shell string `yaml:"shell,omitempty" json:"shell,omitempty"`
 	// Token is the token to be used for the download authentication
 	Token string `yaml:"_" json:"_"`
+	// Settings controls whether this config is active and what happens to installed files when it is not
+	Settings *Settings `yaml:"settings,omitempty" json:"settings,omitempty"`
 }

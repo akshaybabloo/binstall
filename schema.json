@@ -70,6 +70,9 @@
         },
         "shell": {
           "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/Settings"
         }
       },
       "additionalProperties": false,
@@ -135,6 +138,18 @@
         },
         "arch": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Settings": {
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "deleteIfNotActive": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
