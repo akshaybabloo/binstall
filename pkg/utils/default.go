@@ -25,6 +25,10 @@ func ParseYaml(s []byte) (models.Binaries, error) {
 	if err != nil {
 		return models.Binaries{}, err
 	}
+	// A config with no settings block is active by default.
+	if b.Settings == nil {
+		b.Settings = &models.Settings{Active: true}
+	}
 	return b, nil
 }
 

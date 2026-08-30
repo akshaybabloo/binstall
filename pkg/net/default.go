@@ -360,18 +360,81 @@ func uncompressFile(b models.Binaries) error {
 	return nil
 }
 
-func moveFiles(b *models.Binaries) error {
-	// Expand the ~ to the home directory
-	if strings.HasPrefix(b.InstallLocation, "~/") {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get user home directory for install location: %w", err)
-		}
-		b.InstallLocation = filepath.Join(homeDir, b.InstallLocation[2:])
+// expandInstallLocation resolves a leading "~/" in an install location to the user's home directory.
+func expandInstallLocation(installLocation string) (string, error) {
+	if !strings.HasPrefix(installLocation, "~/") {
+		return installLocation, nil
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory for install location: %w", err)
+	}
+	return filepath.Join(homeDir, installLocation[2:]), nil
+}
+
+// RemoveInstalledFiles deletes what a binary installed when its config is inactive
+// and settings.deleteIfNotActive is set.
+//
+// Removing the whole install location is unsafe when it is the shared "~/bin"
+// directory, since other binaries' configs may install there too. In that
+// case only the files this binary installed are removed; otherwise the
+// entire install location directory is removed.
+func RemoveInstalledFiles(b models.Binaries) error {
+	installLocation, err := expandInstallLocation(b.InstallLocation)
+	if err != nil {
+		return err
 	}
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	sharedBinDir := filepath.Join(homeDir, "bin")
+
+	if installLocation == sharedBinDir {
+		for _, file := range b.Files {
+			name := file.FileName
+			if file.RenameTo != "" {
+				name = file.RenameTo
+			}
+			if name == "" || name == "*" {
+				continue
+			}
+			if err := removeIfExists(filepath.Join(installLocation, name)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	return removeIfExists(installLocation)
+}
+
+// removeIfExists deletes the file or directory at path if it exists.
+func removeIfExists(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to stat %s: %w", path, err)
+	}
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("failed to delete %s: %w", path, err)
+	}
+	return nil
+}
+
+func moveFiles(b *models.Binaries) error {
+
+	// Expand the ~ to the home directory
+	expanded, err := expandInstallLocation(b.InstallLocation)
+	if err != nil {
+		return err
+	}
+	b.InstallLocation = expanded
+
 	// Ensure the installation location exists
-	err := os.MkdirAll(b.InstallLocation, 0755)
+	err = os.MkdirAll(b.InstallLocation, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create install directory %s: %w", b.InstallLocation, err)
 	}

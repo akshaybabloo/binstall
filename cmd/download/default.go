@@ -76,6 +76,15 @@ func NewDownloadCmd() *cobra.Command {
 					continue
 				}
 
+				if binary.Settings != nil && !binary.Settings.Active {
+					if binary.Settings.DeleteIfNotActive {
+						if err := net.RemoveInstalledFiles(binary); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+
 				if len(excludeBinaries) > 0 && slices.Contains(excludeBinaries, binary.Name) {
 					continue
 				}
