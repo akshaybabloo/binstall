@@ -1,6 +1,6 @@
 module github.com/akshaybabloo/binstall
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
@@ -12,6 +12,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-github/v89 v89.0.0
 	github.com/google/go-github/v90 v90.0.0
+	github.com/google/go-github/v91 v91.0.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/sirupsen/logrus v1.10.2
