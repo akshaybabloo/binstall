@@ -182,3 +182,62 @@ func TestAvailable_SudoNoPasswordWithoutATerminal(t *testing.T) {
 	r.sudoNonInteractive = func() bool { return true }
 	assert.True(t, r.Available())
 }
+
+func TestZeroValueRunnerIsUsable(t *testing.T) {
+	// The doc comment promises Runner{} works; without lazily filled probes
+	// these calls dereference nil function fields and panic. Only the
+	// resolution paths are exercised - Run would actually escalate, and Run
+	// reaches ensureDefaults through prepareLocked anyway.
+	var r Runner
+	assert.NotPanics(t, func() { r.Available() })
+
+	var p Runner
+	assert.NotPanics(t, func() { _ = p.Prepare() })
+}
+
+func TestNewMatchesZeroValue(t *testing.T) {
+	r := New()
+	require.NotNil(t, r)
+	r.mu.Lock()
+	r.ensureDefaults()
+	r.mu.Unlock()
+
+	assert.NotNil(t, r.lookPath)
+	assert.NotNil(t, r.geteuid)
+	assert.NotNil(t, r.isTerminal)
+	assert.NotNil(t, r.sudoNonInteractive)
+	assert.NotNil(t, r.readPassword)
+	assert.NotNil(t, r.runSudoValidate)
+}
+
+func TestEnsureDefaultsKeepsInjectedProbes(t *testing.T) {
+	r := testRunner(0, nil, false)
+	r.mu.Lock()
+	r.ensureDefaults()
+	r.mu.Unlock()
+	assert.Equal(t, 0, r.geteuid(), "an injected probe must not be overwritten")
+}
+
+func TestBuildCommand_SudoAppliesExtraEnvInsideTheElevatedCommand(t *testing.T) {
+	// sudo's default env_reset drops DEBIAN_FRONTEND, so setting it on the
+	// sudo process is not enough - apt would open a debconf dialog and hang.
+	env := []string{"DEBIAN_FRONTEND=noninteractive"}
+
+	cmd, _ := buildCommand(strategySudoNonInteractive, "", env, "apt-get", []string{"install", "-y", "x.deb"})
+	assert.Equal(t,
+		[]string{"sudo", "-n", "--", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", "x.deb"},
+		cmd.Args)
+
+	cmd, stdin := buildCommand(strategySudoPassword, "hunter2", env, "apt-get", []string{"install"})
+	assert.Equal(t,
+		[]string{"sudo", "-S", "-p", "", "--", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install"},
+		cmd.Args)
+	assert.Equal(t, "hunter2\n", stdin)
+}
+
+func TestWithEnv(t *testing.T) {
+	assert.Equal(t, []string{"dnf", "install"}, withEnv(nil, "dnf", []string{"install"}),
+		"no env means no env(1) wrapper")
+	assert.Equal(t, []string{"env", "A=1", "B=2", "dnf", "install"},
+		withEnv([]string{"A=1", "B=2"}, "dnf", []string{"install"}))
+}

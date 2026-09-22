@@ -328,7 +328,15 @@ func removeInactive(bins []models.Binaries) error {
 // and --dry-run.
 func reportRemovals(bins []models.Binaries) {
 	for _, b := range bins {
-		if net.NeedsRootForRemoval(b) {
+		if t := net.ResolvedInstallType(b); t.IsPackage() {
+			// A package config with install: false never installed anything,
+			// so there is nothing to report removing.
+			if !net.NeedsRootForRemoval(b) {
+				fmt.Printf("%s %s is inactive: nothing to remove (%s with install: false)\n",
+					color.YellowString("!"), b.Name, t)
+				continue
+			}
+
 			name, err := net.PackageToRemove(b)
 			switch {
 			case err != nil:
@@ -337,7 +345,7 @@ func reportRemovals(bins []models.Binaries) {
 				name = "nothing (not installed)"
 			}
 			fmt.Printf("%s %s is inactive: would uninstall %s package %s\n",
-				color.YellowString("!"), b.Name, net.ResolvedInstallType(b), name)
+				color.YellowString("!"), b.Name, t, name)
 			continue
 		}
 		fmt.Printf("%s %s is inactive: would remove installed files from %s\n",

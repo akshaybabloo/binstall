@@ -1,6 +1,8 @@
 package net
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -133,4 +135,40 @@ func TestNeedsRootForRemoval(t *testing.T) {
 	assert.Equal(t, models.PackageTypeArchive, ResolvedInstallType(archive))
 
 	assert.False(t, NeedsRootForRemoval(models.Binaries{Name: "example"}))
+}
+
+func TestRemoveInstalledFiles_InstallFalseLeavesInstallLocationAlone(t *testing.T) {
+	// A package config never writes to InstallLocation, so removing an
+	// inactive one must not delete that directory - it may belong to
+	// something else entirely.
+	installDir := t.TempDir()
+	canary := filepath.Join(installDir, "unrelated-file")
+	require.NoError(t, os.WriteFile(canary, []byte("do not delete me"), 0644))
+
+	no := false
+	b := downloadConfig(t, models.DownloadArchInfo{
+		FileName: "example-{{.Version}}.deb",
+		Type:     "deb",
+		Install:  &no,
+	})
+	b.InstallLocation = installDir
+
+	require.NoError(t, RemoveInstalledFiles(b))
+
+	assert.FileExists(t, canary, "install: false must not delete InstallLocation")
+	assert.DirExists(t, installDir)
+}
+
+func TestRemoveInstalledFiles_ArchiveStillRemovesInstallLocation(t *testing.T) {
+	// The guard above must not stop an ordinary archive config from being
+	// cleaned up.
+	installDir := filepath.Join(t.TempDir(), "archive-install")
+	require.NoError(t, os.MkdirAll(installDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(installDir, "example"), []byte("bin"), 0755))
+
+	b := downloadConfig(t, models.DownloadArchInfo{FileName: "example-{{.Version}}.tar.gz"})
+	b.InstallLocation = installDir
+
+	require.NoError(t, RemoveInstalledFiles(b))
+	assert.NoDirExists(t, installDir)
 }

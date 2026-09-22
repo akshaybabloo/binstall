@@ -70,11 +70,12 @@ var rpmManagers = []packageManager{
 		removeArgs:  func(pkg string) []string { return []string{"remove", "-y", pkg} },
 	},
 	{
-		name: "zypper",
-		installArgs: func(path string) []string {
-			return []string{"--non-interactive", "install", "--allow-unsigned-rpm", path}
-		},
-		removeArgs: func(pkg string) []string { return []string{"--non-interactive", "remove", pkg} },
+		// No --allow-unsigned-rpm: dnf, yum and rpm all verify signatures, and
+		// binstall's own checksum check only runs when the config supplies one,
+		// so skipping verification here would be the weakest link.
+		name:        "zypper",
+		installArgs: func(path string) []string { return []string{"--non-interactive", "install", path} },
+		removeArgs:  func(pkg string) []string { return []string{"--non-interactive", "remove", pkg} },
 	},
 	{
 		name:        "yum",

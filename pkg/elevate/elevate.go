@@ -84,13 +84,30 @@ type Runner struct {
 
 // New returns a Runner backed by the real process environment.
 func New() *Runner {
-	return &Runner{
-		lookPath:           exec.LookPath,
-		geteuid:            os.Geteuid,
-		isTerminal:         func() bool { return term.IsTerminal(int(os.Stdin.Fd())) },
-		sudoNonInteractive: sudoNonInteractiveWorks,
-		readPassword:       readPasswordFromTerminal,
-		runSudoValidate:    sudoValidate,
+	return &Runner{}
+}
+
+// ensureDefaults fills in the probes a zero-value Runner leaves nil, so
+// Runner{} behaves the same as New(). Tests set these fields explicitly and
+// those values are left alone. Callers must hold r.mu.
+func (r *Runner) ensureDefaults() {
+	if r.lookPath == nil {
+		r.lookPath = exec.LookPath
+	}
+	if r.geteuid == nil {
+		r.geteuid = os.Geteuid
+	}
+	if r.isTerminal == nil {
+		r.isTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	}
+	if r.sudoNonInteractive == nil {
+		r.sudoNonInteractive = sudoNonInteractiveWorks
+	}
+	if r.readPassword == nil {
+		r.readPassword = readPasswordFromTerminal
+	}
+	if r.runSudoValidate == nil {
+		r.runSudoValidate = sudoValidate
 	}
 }
 
@@ -100,6 +117,7 @@ func New() *Runner {
 func (r *Runner) Available() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.ensureDefaults()
 	if r.strategy != strategyUnresolved {
 		return true
 	}
@@ -127,6 +145,7 @@ func (r *Runner) prepareLocked() error {
 	if r.strategy != strategyUnresolved {
 		return nil
 	}
+	r.ensureDefaults()
 
 	if r.geteuid() == 0 {
 		r.strategy = strategyDirect
@@ -216,25 +235,34 @@ func (r *Runner) RunWithEnv(extraEnv []string, name string, args ...string) ([]b
 func buildCommand(strat strategy, password string, extraEnv []string, name string, args []string) (*exec.Cmd, string) {
 	switch strat {
 	case strategySudoNonInteractive:
-		return exec.Command("sudo", append([]string{"-n", "--"}, append([]string{name}, args...)...)...), ""
+		return exec.Command("sudo", append([]string{"-n", "--"}, withEnv(extraEnv, name, args)...)...), ""
 	case strategySudoPassword:
 		// -S reads the password from stdin; -p "" suppresses sudo's own prompt
 		// since the password was already collected by promptForPassword.
-		return exec.Command("sudo", append([]string{"-S", "-p", "", "--"}, append([]string{name}, args...)...)...), password + "\n"
+		return exec.Command("sudo", append([]string{"-S", "-p", "", "--"}, withEnv(extraEnv, name, args)...)...), password + "\n"
 	case strategyPkexec:
-		// pkexec scrubs the environment, so anything the command needs has to
-		// be re-applied inside the elevated shell via env(1).
-		pkArgs := []string{}
-		if len(extraEnv) > 0 {
-			pkArgs = append(pkArgs, "env")
-			pkArgs = append(pkArgs, extraEnv...)
-		}
-		pkArgs = append(pkArgs, name)
-		pkArgs = append(pkArgs, args...)
-		return exec.Command("pkexec", pkArgs...), ""
+		return exec.Command("pkexec", withEnv(extraEnv, name, args)...), ""
 	default:
 		return exec.Command(name, args...), ""
 	}
+}
+
+// withEnv builds the target invocation, prefixing env(1) when the command needs
+// environment variables of its own.
+//
+// Both escalation tools drop the caller's environment: pkexec scrubs it
+// outright, and sudo's default env_reset policy keeps only the variables listed
+// in env_keep, which does not include DEBIAN_FRONTEND. Setting them on the sudo
+// process is therefore not enough - apt would still open a debconf dialog and
+// hang behind the spinner - so they are re-applied inside the elevated command.
+func withEnv(extraEnv []string, name string, args []string) []string {
+	out := make([]string, 0, len(extraEnv)+len(args)+2)
+	if len(extraEnv) > 0 {
+		out = append(out, "env")
+		out = append(out, extraEnv...)
+	}
+	out = append(out, name)
+	return append(out, args...)
 }
 
 // sudoNonInteractiveWorks reports whether sudo can run without a password,

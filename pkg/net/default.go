@@ -431,7 +431,15 @@ func RemoveInstalledFiles(b models.Binaries) error {
 		return err
 	}
 
-	if b.IsPackageInstall() {
+	if b.ResolvedType().IsPackage() {
+		if !b.IsPackageInstall() {
+			// install: false - the file was only downloaded, so nothing was
+			// installed anywhere. InstallLocation is never written to by a
+			// package config, and may well belong to something else, so
+			// deleting it here would destroy unrelated files.
+			logrus.Debugf("%s is a %s config with install: false, nothing to remove", b.Name, b.ResolvedType())
+			return nil
+		}
 		return removePackage(b)
 	}
 
