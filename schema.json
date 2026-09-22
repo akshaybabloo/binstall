@@ -88,6 +88,19 @@
       "properties": {
         "fileName": {
           "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "archive",
+            "deb",
+            "rpm"
+          ],
+          "description": "How this file is installed. Inferred from the file name extension when omitted."
+        },
+        "install": {
+          "type": "boolean",
+          "description": "Install through the system package manager. Defaults to true for deb and rpm."
         }
       },
       "additionalProperties": false,
