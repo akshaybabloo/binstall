@@ -79,9 +79,7 @@
       "type": "object",
       "required": [
         "name",
-        "url",
-        "files",
-        "installLocation"
+        "url"
       ]
     },
     "DownloadArchInfo": {

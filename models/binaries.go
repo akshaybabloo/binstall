@@ -123,7 +123,7 @@ type Binaries struct {
 	URL  string `yaml:"url,omitempty" json:"url"`
 
 	Download         map[string]map[string]DownloadArchInfo `yaml:"download,omitempty" json:"download,omitempty"`
-	Files            []File                                 `yaml:"files,omitempty" json:"files"`
+	Files            []File                                 `yaml:"files,omitempty" json:"files,omitempty"`
 	Sha              ShaInfo                                `yaml:"sha,omitempty" json:"sha,omitempty"`
 	UpdatesAvailable bool                                   `yaml:"updatesAvailable,omitempty" json:"updatesAvailable,omitempty"`
 	Description      string                                 `yaml:"description,omitempty" json:"description,omitempty"`
@@ -134,7 +134,7 @@ type Binaries struct {
 	ContentType      string                                 `yaml:"contentType,omitempty" json:"contentType,omitempty"`
 	DownloadFolder   string                                 `yaml:"downloadFolder,omitempty" json:"downloadFolder,omitempty"`
 	DownloadFilePath string                                 `yaml:"downloadPath,omitempty" json:"downloadPath,omitempty"`
-	InstallLocation  string                                 `yaml:"installLocation" json:"installLocation"`
+	InstallLocation  string                                 `yaml:"installLocation,omitempty" json:"installLocation,omitempty"`
 	CurrentVersion   string                                 `yaml:"currentVersion,omitempty" json:"currentVersion,omitempty"`
 	NewVersion       string                                 `yaml:"newVersion,omitempty" json:"newVersion,omitempty"`
 
