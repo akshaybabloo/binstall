@@ -47,16 +47,16 @@ var newGitHubClient = func(token string) (*github.Client, error) {
 	return github.NewClient()
 }
 
-// resolveDownloadFileName checks the Binaries.Download config for an explicit file name
-// matching the current OS/arch. Returns the rendered file name, or empty string if none configured.
-func resolveDownloadFileName(b models.Binaries, tagName string) string {
+// resolveDownloadEntry returns the Binaries.Download entry for the current
+// OS/arch, or false when the config has none.
+func resolveDownloadEntry(b models.Binaries) (models.DownloadArchInfo, bool) {
 	if b.Download == nil {
-		return ""
+		return models.DownloadArchInfo{}, false
 	}
 
 	archMap, ok := b.Download[runtime.GOOS]
 	if !ok {
-		return ""
+		return models.DownloadArchInfo{}, false
 	}
 
 	// Look up arch entry, normalizing the config key to match runtime.GOARCH
@@ -65,16 +65,47 @@ func resolveDownloadFileName(b models.Binaries, tagName string) string {
 			if info.FileName == "" {
 				continue
 			}
-			rendered, err := utils.RenderDownloadTemplate(info.FileName, tagName)
-			if err != nil {
-				logrus.Warnf("Failed to render download template for %s: %v", b.Name, err)
-				continue
-			}
-			return rendered
+			return info, true
 		}
 	}
 
-	return ""
+	return models.DownloadArchInfo{}, false
+}
+
+// resolveDownloadFileName checks the Binaries.Download config for an explicit file name
+// matching the current OS/arch. Returns the rendered file name, or empty string if none configured.
+func resolveDownloadFileName(b models.Binaries, tagName string) string {
+	info, ok := resolveDownloadEntry(b)
+	if !ok {
+		return ""
+	}
+
+	rendered, err := utils.RenderDownloadTemplate(info.FileName, tagName)
+	if err != nil {
+		logrus.Warnf("Failed to render download template for %s: %v", b.Name, err)
+		return ""
+	}
+	return rendered
+}
+
+// resolveInstallSpec records how the download entry for this host says the file
+// should be installed. Only the file name's extension matters for the type, so
+// this works before a release version is known - which is what lets an inactive
+// config be uninstalled without contacting the provider first.
+func resolveInstallSpec(b models.Binaries) (models.Binaries, error) {
+	info, ok := resolveDownloadEntry(b)
+	if !ok {
+		return b, nil
+	}
+
+	t, err := info.ResolvedType()
+	if err != nil {
+		return b, fmt.Errorf("%s: %w", b.Name, err)
+	}
+
+	b.InstallType = string(t)
+	b.InstallPackage = info.ShouldInstall()
+	return b, nil
 }
 
 func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
@@ -96,6 +127,7 @@ func getCurrentVersion(b models.Binaries) (models.Binaries, error) {
 			b.CurrentVersion = ver
 		}
 	}
+
 	return b, nil
 }
 
@@ -174,6 +206,15 @@ func checkForNewVersion(b models.Binaries, a ...string) (models.Binaries, error)
 // 3. Check for the new version of the binary
 // 4. Compare the current version with the new version
 func CheckUpdates(b models.Binaries, a ...string) (models.Binaries, error) {
+	if err := b.ValidateType(); err != nil {
+		return models.Binaries{}, err
+	}
+
+	b, err := resolveInstallSpec(b)
+	if err != nil {
+		return models.Binaries{}, err
+	}
+
 	_version, err := getCurrentVersion(b)
 	if err != nil {
 		// If not found, install the binary
@@ -379,7 +420,29 @@ func expandInstallLocation(installLocation string) (string, error) {
 // directory, since other binaries' configs may install there too. In that
 // case only the files this binary installed are removed; otherwise the
 // entire install location directory is removed.
+// A deb or rpm install is owned by the package manager, which knows every path
+// it wrote; deleting InstallLocation would miss those files entirely, so such a
+// config is uninstalled through the package manager instead.
 func RemoveInstalledFiles(b models.Binaries) error {
+	// An inactive config never goes through CheckUpdates, so the download
+	// entry has to be read here to tell a package apart from an archive.
+	b, err := resolveInstallSpec(b)
+	if err != nil {
+		return err
+	}
+
+	if b.ResolvedType().IsPackage() {
+		if !b.IsPackageInstall() {
+			// install: false - the file was only downloaded, so nothing was
+			// installed anywhere. InstallLocation is never written to by a
+			// package config, and may well belong to something else, so
+			// deleting it here would destroy unrelated files.
+			logrus.Debugf("%s is a %s config with install: false, nothing to remove", b.Name, b.ResolvedType())
+			return nil
+		}
+		return removePackage(b)
+	}
+
 	installLocation, err := expandInstallLocation(b.InstallLocation)
 	if err != nil {
 		return err
@@ -761,36 +824,52 @@ func verifyNewBin(b models.Binaries) error {
 			return fmt.Errorf("failed to execute %s: %w\nOutput: %s", fullPath, err, stdout)
 		}
 
-		match, err := utils.ExtractVersion(string(stdout), file.VersionCommand.RegexVersion)
-		if err != nil {
-			return fmt.Errorf("failed to compile regex for %s: %w", file.FileName, err)
-		}
-
-		installedVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(match)))
-		if err != nil {
-			return fmt.Errorf("failed to parse installed version for %s: %w", file.FileName, err)
-		}
-
-		newVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(b.NewVersion)))
-		if err != nil {
-			return fmt.Errorf("failed to parse new version for %s: %w", file.FileName, err)
-		}
-
-		if !installedVersion.Equal(newVersion) {
-			return fmt.Errorf("version mismatch for %s. Installed: %s, Expected: %s",
-				file.FileName, installedVersion.String(), newVersion.String())
+		if err := compareInstalledVersion(file.FileName, string(stdout), file.VersionCommand.RegexVersion, b.NewVersion); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// DownloadAndMoveFiles Does five things:
+// compareInstalledVersion extracts a version from a binary's output and checks
+// it against the release that was just installed. Shared by the archive and
+// package install paths.
+func compareInstalledVersion(fileName, output, regex, expected string) error {
+	match, err := utils.ExtractVersion(output, regex)
+	if err != nil {
+		return fmt.Errorf("failed to compile regex for %s: %w", fileName, err)
+	}
+
+	installedVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(match)))
+	if err != nil {
+		return fmt.Errorf("failed to parse installed version for %s: %w", fileName, err)
+	}
+
+	newVersion, err := version.NewVersion(utils.NormalizeLetterSuffix(strings.TrimSpace(expected)))
+	if err != nil {
+		return fmt.Errorf("failed to parse new version for %s: %w", fileName, err)
+	}
+
+	if !installedVersion.Equal(newVersion) {
+		return fmt.Errorf("version mismatch for %s. Installed: %s, Expected: %s",
+			fileName, installedVersion.String(), newVersion.String())
+	}
+	return nil
+}
+
+// DownloadAndMoveFiles downloads a release asset and installs it.
+//
+// For an archive it does five things:
 //
 // 1. Download the file
 // 2. Verify the file
 // 3. Uncompress the file
 // 4. Move the files to the install location
 // 5. Verify the new binary
+//
+// For a deb or rpm the download and checksum verification are the same, but
+// steps 3 to 5 are replaced by handing the file to the host's package manager
+// and then confirming the installed version.
 func DownloadAndMoveFiles(b models.Binaries) error {
 	dl, err := downloadFile(b)
 	if err != nil {
@@ -800,6 +879,18 @@ func DownloadAndMoveFiles(b models.Binaries) error {
 	file, err := verifyFile(dl)
 	if err != nil && !file {
 		return err
+	}
+
+	if dl.ResolvedType().IsPackage() {
+		if !dl.IsPackageInstall() {
+			// install: false - the file was wanted on disk but not installed.
+			logrus.Debugf("Downloaded %s to %s without installing it", dl.DownloadFileName, dl.DownloadFilePath)
+			return nil
+		}
+		if err := installPackage(dl); err != nil {
+			return err
+		}
+		return verifyPackageInstall(dl)
 	}
 
 	err = uncompressFile(dl)

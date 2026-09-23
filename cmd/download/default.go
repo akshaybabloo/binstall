@@ -67,6 +67,7 @@ func NewDownloadCmd() *cobra.Command {
 			}
 
 			var bins []models.Binaries
+			var pendingRemovals []models.Binaries
 			for binary, err := range data {
 				if err != nil {
 					return err
@@ -78,9 +79,10 @@ func NewDownloadCmd() *cobra.Command {
 
 				if binary.Settings != nil && !binary.Settings.Active {
 					if binary.Settings.DeleteIfNotActive {
-						if err := net.RemoveInstalledFiles(binary); err != nil {
-							return err
-						}
+						// Deferred: removing a deb/rpm needs root, and asking
+						// for a password under a running spinner would hide
+						// the prompt.
+						pendingRemovals = append(pendingRemovals, binary)
 					}
 					continue
 				}
@@ -112,13 +114,21 @@ func NewDownloadCmd() *cobra.Command {
 				}
 			}
 
+			s.Stop()
+
+			// --check and --dry-run must not change anything, so inactive
+			// configs are only reported, not uninstalled.
+			if isCheckOnly || dryRun {
+				reportRemovals(pendingRemovals)
+			} else if err := removeInactive(pendingRemovals); err != nil {
+				return err
+			}
+
 			if len(binUpdates) == 0 {
-				s.Stop()
 				fmt.Println(color.GreenString("No updates available"))
 				return nil
 			}
-			s.FinalMSG = color.GreenString("Updates found\n")
-			s.Stop()
+			fmt.Print(color.GreenString("Updates found\n"))
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
@@ -137,6 +147,14 @@ func NewDownloadCmd() *cobra.Command {
 						fmt.Printf("  Current Version: %s\n", update.CurrentVersion)
 						fmt.Printf("  New Version: %s\n", update.NewVersion)
 						fmt.Printf("  Download URL: %s\n", update.DownloadURL)
+						if update.IsPackageInstall() {
+							manager := net.PackageManagerName(update)
+							if manager == "" {
+								manager = color.RedString("no package manager available on this host")
+							}
+							fmt.Printf("  Install Method: %s package via %s (requires root)\n", update.ResolvedType(), manager)
+							continue
+						}
 						fmt.Printf("  Install Location: %s\n", update.InstallLocation)
 						fmt.Printf("  Files:\n")
 						for _, file := range update.Files {
@@ -166,6 +184,15 @@ func NewDownloadCmd() *cobra.Command {
 				}
 				if input != "" && (input == "no" || input == "n" || input == "N") {
 					return nil
+				}
+			}
+
+			// Package installs need root. Acquire it here, while the terminal
+			// is still free, so the workers below never compete for a password
+			// prompt behind the spinner.
+			if slices.ContainsFunc(binUpdates, net.NeedsRoot) {
+				if err := net.PrepareElevation(); err != nil {
+					return err
 				}
 			}
 
@@ -253,4 +280,75 @@ func NewDownloadCmd() *cobra.Command {
 	downloadCmd.Flags().StringSliceVarP(&includeBinaries, "include", "i", []string{}, "Include only specified binaries in update")
 
 	return downloadCmd
+}
+
+// removeInactive uninstalls configs that are marked inactive with
+// settings.deleteIfNotActive.
+//
+// Every package name is resolved before root is acquired. That keeps a
+// misconfigured entry from failing only after the user has typed a password,
+// and means a run whose packages are already gone never prompts at all. Root
+// is then acquired once, so removing several packages asks at most once.
+func removeInactive(bins []models.Binaries) error {
+	if len(bins) == 0 {
+		return nil
+	}
+
+	needsRoot := false
+	for _, b := range bins {
+		if !net.NeedsRootForRemoval(b) {
+			continue
+		}
+		name, err := net.PackageToRemove(b)
+		if err != nil {
+			return err
+		}
+		// An empty name means the package is not installed, so removing it
+		// needs no privileges.
+		if name != "" {
+			needsRoot = true
+		}
+	}
+
+	if needsRoot {
+		if err := net.PrepareElevation(); err != nil {
+			return err
+		}
+	}
+
+	for _, b := range bins {
+		if err := net.RemoveInstalledFiles(b); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reportRemovals prints what an inactive config would uninstall, for --check
+// and --dry-run.
+func reportRemovals(bins []models.Binaries) {
+	for _, b := range bins {
+		if t := net.ResolvedInstallType(b); t.IsPackage() {
+			// A package config with install: false never installed anything,
+			// so there is nothing to report removing.
+			if !net.NeedsRootForRemoval(b) {
+				fmt.Printf("%s %s is inactive: nothing to remove (%s with install: false)\n",
+					color.YellowString("!"), b.Name, t)
+				continue
+			}
+
+			name, err := net.PackageToRemove(b)
+			switch {
+			case err != nil:
+				name = color.RedString(err.Error())
+			case name == "":
+				name = "nothing (not installed)"
+			}
+			fmt.Printf("%s %s is inactive: would uninstall %s package %s\n",
+				color.YellowString("!"), b.Name, t, name)
+			continue
+		}
+		fmt.Printf("%s %s is inactive: would remove installed files from %s\n",
+			color.YellowString("!"), b.Name, b.InstallLocation)
+	}
 }
