@@ -15,7 +15,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.9.2
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
-	github.com/stoewer/go-strcase v1.3.1
+	github.com/stoewer/go-strcase v1.4.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/term v0.48.0
 	golift.io/xtractr v0.9.0
